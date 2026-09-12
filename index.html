@@ -1,0 +1,4329 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>楽譜タイトル判定・複数ジャンル対応</title>
+<style>
+:root{
+  --bg:#f4f5f7;
+  --card:#fff;
+  --line:#d7dce2;
+  --text:#20242a;
+  --sub:#68717d;
+  --accent:#2563eb;
+  --danger:#b42318;
+  --ok:#08783e;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+}
+.wrap{width:min(1180px,calc(100% - 24px));margin:20px auto 40px}
+h1{font-size:24px;margin:0 0 14px}
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px;
+}
+.drop{
+  min-height:135px;
+  border:2px dashed #9ba3ae;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  cursor:pointer;
+  background:#fafbfc;
+  padding:18px;
+}
+.drop.drag{border-color:var(--accent);background:#eff6ff}
+.drop strong{display:block;font-size:18px;margin-bottom:5px}
+input[type=file]{display:none}
+.controls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
+  align-items:end;
+}
+.control{display:flex;flex-direction:column;gap:5px}
+.control label{font-size:12px;color:var(--sub)}
+select{
+  height:40px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:0 10px;
+  background:#fff;
+  font-size:14px;
+}
+button{
+  border:0;
+  border-radius:8px;
+  padding:10px 15px;
+  font-size:14px;
+  cursor:pointer;
+}
+button.primary{background:var(--accent);color:#fff}
+button.secondary{background:#edf1f5;color:var(--text)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{margin-top:12px;font-size:14px;line-height:1.7}
+.progress{
+  height:9px;
+  background:#e6e9ee;
+  overflow:hidden;
+  border-radius:999px;
+  margin-top:8px;
+}
+.progress div{
+  height:100%;
+  width:0%;
+  background:var(--accent);
+  transition:width .15s;
+}
+.note{margin-top:10px;color:var(--sub);font-size:12px;line-height:1.6}
+.error{color:var(--danger);font-weight:600}
+.ok{color:var(--ok);font-weight:600}
+.list{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+.item{
+  position:relative;
+  display:grid;
+  grid-template-columns:600px 1fr;
+  gap:14px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 10px 54px 10px;
+}
+.thumbCrop{
+  width:600px;
+  overflow:hidden;
+  border:1px solid #e2e5e9;
+  background:#fff;
+}
+.thumb{
+  display:block;
+  width:600px;
+  height:auto;
+  object-fit:contain;
+  object-position:top center;
+  background:#fff;
+}
+.right{min-width:0}
+.original{
+  font-size:12px;
+  color:var(--sub);
+  margin-bottom:6px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.titleRow{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+}
+.titleInput{
+  width:100%;
+  height:42px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:0 10px;
+  font-size:16px;
+  font-weight:600;
+}
+.smallbtn{background:#edf1f5;padding:8px 12px}
+.deletebtn{
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  width:38px;
+  height:38px;
+  padding:0;
+  border:1px solid #e0b4b4;
+  background:#fff5f5;
+  color:#b42318;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.deletebtn:hover{
+  background:#fee2e2;
+}
+.deletebtn svg{
+  width:20px;
+  height:20px;
+  pointer-events:none;
+}
+.candidates{margin-top:7px;font-size:12px;color:var(--sub);line-height:1.55}
+.filename{margin-top:7px;font-size:13px;color:#374151;word-break:break-all}
+.ocrchoices{
+  margin-top:8px;
+  padding:8px;
+  background:#f7f8fa;
+  border-radius:7px;
+}
+.ocrchoicesTitle{
+  font-size:12px;
+  color:#5b6470;
+  margin-bottom:7px;
+}
+.ocrbuttons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  max-height:150px;
+  overflow:auto;
+}
+.ocrbtn{
+  border:1px solid #cfd6df;
+  background:#fff;
+  color:#26313d;
+  border-radius:7px;
+  padding:7px 10px;
+  font-size:12px;
+  line-height:1.35;
+  cursor:pointer;
+  max-width:100%;
+  white-space:normal;
+  text-align:left;
+}
+.ocrbtn:hover{
+  background:#eaf2ff;
+  border-color:#8fb4ff;
+}
+.ocrbtn.selected{
+  background:#dbeafe;
+  border-color:#2563eb;
+  color:#1d4ed8;
+  font-weight:600;
+}
+.suggestBox{
+  margin-top:10px;
+  padding:10px;
+  background:#fffbea;
+  border:1px solid #eadf9b;
+  border-radius:8px;
+}
+.suggestTitle{
+  font-size:12px;
+  font-weight:700;
+  color:#6b5d12;
+  margin-bottom:7px;
+}
+.suggestButtons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.suggestBtn{
+  border:1px solid #d8c869;
+  background:#fff;
+  color:#4b451c;
+  border-radius:7px;
+  padding:7px 10px;
+  font-size:12px;
+  line-height:1.35;
+  cursor:pointer;
+  max-width:100%;
+  white-space:normal;
+  text-align:left;
+}
+.suggestBtn:hover{
+  background:#fff5bd;
+}
+.suggestBtn.selected{
+  background:#fde68a;
+  border-color:#ca8a04;
+  font-weight:700;
+}
+.suggestStatus{
+  font-size:11px;
+  color:#776b2c;
+}
+.moreCandidatesBtn{
+  margin-top:10px;
+  background:#e8eef5;
+  color:#26313d;
+  border:1px solid #cfd7e2;
+  padding:9px 13px;
+  border-radius:8px;
+  font-size:13px;
+  cursor:pointer;
+}
+.moreCandidatesBtn:hover{
+  background:#dde7f2;
+}
+.moreCandidatesBtn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+@media(max-width:640px){
+  .item{
+    grid-template-columns:400px 1fr;
+    overflow-x:auto;
+  }
+  .thumbCrop{width:400px}
+  .thumb{width:400px}
+  .titleRow{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>楽譜タイトルでファイル名変更</h1>
+
+  <div class="panel">
+    <label class="drop" id="drop" for="files">
+      <div>
+        <strong>楽譜画像をまとめて選択</strong>
+        JPEG・PNG・WebPを複数選択できます
+      </div>
+    </label>
+    <input id="files" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple>
+
+    <div class="controls">
+      <div class="control">
+        <label for="ocrHeight">解析する上部範囲</label>
+        <select id="ocrHeight">
+          <option value="0.10">上10%</option>
+          <option value="0.15" selected>上15%</option>
+          <option value="0.20">上20%</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="lang">OCR言語</label>
+        <select id="lang">
+          <option value="eng" selected>英語中心</option>
+          <option value="jpn+eng">日本語＋英語</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="prefix">連番</label>
+        <select id="prefix">
+          <option value="none" selected>付けない</option>
+          <option value="2">01 曲名</option>
+          <option value="3">001 曲名</option>
+        </select>
+      </div>
+
+      <button class="primary" id="analyze" disabled>タイトルを判定</button>
+      <button class="secondary" id="zip" disabled>名前を変えてZIP保存</button>
+      <button class="secondary" id="clear">クリア</button>
+    </div>
+
+    <div class="status" id="status">楽譜画像を選択してください。</div>
+    <div class="progress"><div id="bar"></div></div>
+
+    <div class="note">
+      初回のタイトル判定では通常OCRだけを使用します。
+      OCR完了後、その結果を登録済みの楽曲名辞書と自動で曖昧一致させ、近い曲名候補を最初からボタン表示します。
+      追加OCRや別のOCRエンジン、外部検索は使用しません。曲名辞書には、添付の「Info CD TOC（総目次）」から抽出した2791曲名を追加し、既存辞書と合わせて2958件を登録しています。
+      OCR結果が少し崩れていても、既知のジャズ、R&B、ポップス、ラテン、ボサノバ、ロック、フュージョンなどの曲名に近ければ上位候補に表示します。
+      候補が曖昧な場合は候補数を多めに表示します。
+      サムネイルは画像の上1/3だけを表示し、横幅は従来の2倍で表示します。
+    </div>
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const filesInput = document.getElementById("files");
+const drop = document.getElementById("drop");
+const analyzeBtn = document.getElementById("analyze");
+const zipBtn = document.getElementById("zip");
+const clearBtn = document.getElementById("clear");
+const statusEl = document.getElementById("status");
+const bar = document.getElementById("bar");
+const listEl = document.getElementById("list");
+const ocrHeightEl = document.getElementById("ocrHeight");
+const langEl = document.getElementById("lang");
+const prefixEl = document.getElementById("prefix");
+
+let selected = [];
+let results = [];
+let worker = null;
+
+
+function setStatus(text,cls=""){
+  statusEl.textContent = text;
+  statusEl.className = "status " + cls;
+}
+
+function setProgress(v){
+  bar.style.width = Math.max(0,Math.min(100,v)) + "%";
+}
+
+function extOf(name){
+  const m = name.match(/\.([^.]+)$/);
+  return m ? "." + m[1].toLowerCase() : ".jpg";
+}
+
+function baseOf(name){
+  return name.replace(/\.[^.]+$/,"");
+}
+
+function sanitizeName(s){
+  return (s || "")
+    .replace(/[\\/:*?"<>|]/g," ")
+    .replace(/\s+/g," ")
+    .replace(/^[\s._-]+|[\s._-]+$/g,"")
+    .trim();
+}
+
+function normalizeLine(s){
+  return (s || "")
+    .replace(/[|¦]/g,"I")
+    .replace(/\s{2,}/g," ")
+    .trim();
+}
+
+function looksLikeCredit(s){
+  return /\b(music|music by|lyrics?|lyric by|words?|words by|composed?|composer|arranged?|arr\.?|copyright|permission|used by|published|publishing|inc\.?|corp\.?)\b/i.test(s);
+}
+
+function looksLikeChord(s){
+  const t = s.trim();
+  if(!t) return true;
+
+  const pieces = t.split(/\s+/);
+
+  if(pieces.length > 5) return false;
+
+  const chordPattern =
+    /^[A-G](?:#|b|♭|♯)?(?:m|mi|min|maj|ma|dim|aug|sus|add)?(?:\d{0,2})?(?:\([^)]*\))?(?:\/[A-G](?:#|b|♭|♯)?)?$/i;
+
+  const n = pieces.filter(x=>chordPattern.test(x.replace(/[,:;]/g,""))).length;
+  return n >= Math.max(1,Math.ceil(pieces.length * 0.7));
+}
+
+function looksLikeTempo(s){
+  return /\b(intro|freely|slow|bossa|swing|ballad|medium|fast|rubato|tempo|verse|chorus|bridge|coda|fine|segno)\b/i.test(s);
+}
+
+function looksLikePageNo(s){
+  return /^\s*\d{1,4}\s*$/.test(s);
+}
+
+function looksLikeLyricSentence(s){
+  const words = s.trim().split(/\s+/).filter(Boolean);
+  return words.length >= 7;
+}
+
+function letterRatio(s){
+  const n = (s.match(/[A-Za-zÀ-ÿ一-龯ぁ-んァ-ヶ]/g) || []).length;
+  return n / Math.max(1,s.length);
+}
+
+function median(values){
+  const a = values.filter(Number.isFinite).sort((x,y)=>x-y);
+  if(!a.length) return 1;
+  const mid = Math.floor(a.length/2);
+  return a.length % 2 ? a[mid] : (a[mid-1] + a[mid]) / 2;
+}
+const MUSIC_TITLES = [
+  "12-4 2-4/Duplicities",
+  "12th Street Rag",
+  "26-2",
+  "317 E. 32nd St",
+  "34 Skidoo",
+  "502 Blues",
+  "52nd Street Theme",
+  "720 In The Books",
+  "728",
+  "9:20 Special",
+  "A Child Is Born",
+  "A Felicidade",
+  "A Foggy Day",
+  "A Night in Tunisia",
+  "Ablution",
+  "AC-DC Current",
+  "Across The Alley From The Alamo",
+  "Actual Proof",
+  "Adams Apple",
+  "Aerie (The)",
+  "Affirmation",
+  "Afreaka",
+  "Africa",
+  "Africaine",
+  "African Flower",
+  "Afro Blue",
+  "Afro-Centric",
+  "After Fact",
+  "After Hours",
+  "After The Rain",
+  "After You",
+  "After You've Gone",
+  "Afternoon In Paris",
+  "Against All Odds",
+  "Agua de Beber",
+  "Aguas de Marco",
+  "Ah-Leu-Cha",
+  "Ain't It The Truth",
+  "Ain't Misbehavin",
+  "Ain't Misbehavin'",
+  "Ain't No Sunshine",
+  "Ain't That Peculiar",
+  "Ain't Too Proud to Beg",
+  "Air Conditioning",
+  "Air Mail Special",
+  "Airegin",
+  "Airmail Special",
+  "Aisha",
+  "Aja's Theme",
+  "Alanjuneally",
+  "Alfie",
+  "Alfie's Theme",
+  "Algo Bueno",
+  "Algo Bueno (Woody'n You)",
+  "Alice in Wonderland",
+  "All About Ronnie",
+  "All Alone",
+  "All Blues",
+  "All God's Chillun Got Rhythm",
+  "All In Love Is Fair",
+  "All Members",
+  "All My Tomorrows",
+  "All of Me",
+  "All of You",
+  "All Or Nothing At Al",
+  "All Or Nothing At All",
+  "All the Things You Are",
+  "All Too Soon",
+  "All You Were To Us",
+  "Almost Like Being In Love",
+  "Alone Together",
+  "Along Came Betty",
+  "Alright Okay You Win",
+  "Altoitis",
+  "Always And Forever",
+  "Always on My Mind",
+  "Always There",
+  "Amapola (Pretty Little Poppy)",
+  "Amazing Grace",
+  "American Gothic",
+  "Among My Souvenirs",
+  "Amor em Paz",
+  "Amor Sonador",
+  "An Oscar For Treadwell",
+  "Ana Maria",
+  "Anamaria",
+  "And All That jazz",
+  "And It All Goes Round",
+  "And Now The Queen",
+  "And On The Third Day",
+  "Angel Eyes",
+  "Angela",
+  "Another Hairdo",
+  "Another Kind Of Soul",
+  "Another Star",
+  "Another Time",
+  "Anthropology",
+  "Anti Climax",
+  "Antigua",
+  "Apple Core",
+  "Apple Honey",
+  "Appointment In Ghana",
+  "April",
+  "April Head",
+  "April in Paris",
+  "April Joy",
+  "April Skids",
+  "Aquarius",
+  "Are They Only Dreams",
+  "Aren't You Glad You're You",
+  "Arietas",
+  "Arise Her Eyes",
+  "Armageddon",
+  "Armando's Rhumba",
+  "Around Again",
+  "Arriving Soon",
+  "Arthur's Theme",
+  "As Catch Can",
+  "As Time Goes By",
+  "ASA",
+  "Ask Me Now",
+  "At Last",
+  "Au Privave",
+  "Aura",
+  "Autumn In 3",
+  "Autumn in New York",
+  "Autumn Leaves",
+  "Autumn Liebs",
+  "Autumn Nocturne",
+  "Autumn Serenade",
+  "Avalon",
+  "Avalon Place",
+  "Avance",
+  "Ay Arriba!",
+  "Azule Serape",
+  "B Minor Waltz",
+  "B-Sting",
+  "Ba-Lue Bolivar Ba-Lues-Are",
+  "Baby",
+  "Baby Breeze",
+  "Baby Come To Me",
+  "Baby I Love You",
+  "Baby It's Cold Outside",
+  "Baby Steps",
+  "Back at One",
+  "Back Home Blues",
+  "Back Talk",
+  "Background Music",
+  "Backstage Sally",
+  "Bad Powell",
+  "Bag's Groove",
+  "Bags And Trane",
+  "Bags Groove",
+  "Bags' Groove",
+  "Bags' New Groove",
+  "Baja Bajo",
+  "Bakai",
+  "Ballad (A)",
+  "Ballad For Anita",
+  "Ballad For Doll(A)",
+  "Ballad For Trane",
+  "Ballad For Two Musicians",
+  "Ballet",
+  "Ballin' The Jack",
+  "Band Aid",
+  "Barbados",
+  "Barbara",
+  "Bark For Barksdale",
+  "Bark for Barsdale",
+  "Basie Eyes",
+  "Basin Street Blues",
+  "Bass Blues",
+  "Batter Up",
+  "Batterie",
+  "Baubles Bangles & Beads",
+  "Be Bop",
+  "Be My Love",
+  "Be-Bop",
+  "Bea's Flat",
+  "Beach Wise",
+  "Beach-Wise",
+  "Beatrice",
+  "Beautiful Friendship",
+  "Beautiful Friendship (A)",
+  "Beautiful Love",
+  "Beauty and the Beast",
+  "Beauty And The Blast",
+  "Because You Loved Me",
+  "Beethoven's Blue 3rd",
+  "Before And After",
+  "Before I Let Go",
+  "Below Zero",
+  "Bemsha Swing",
+  "Beneath It All",
+  "Berimbau",
+  "Berkshire Blues",
+  "Bernie's Tune",
+  "Bernies Tune",
+  "Berrie's Tune",
+  "Besame Mucho",
+  "Beside Myself",
+  "Bess You Is My Woman",
+  "Bess You Is My Woman Now",
+  "Bessie's Blues",
+  "Best Is Yet To Come (The)",
+  "Best Thing For You Is Me",
+  "Best Things In Life Are Free (The)",
+  "Better Git It In Your Soul",
+  "Between the Sheets",
+  "Bewitched",
+  "Beyond All Limits",
+  "Beyond The Bluebird",
+  "Bid For(A)",
+  "Big Bear",
+  "Big Ben",
+  "Big Bertha",
+  "Big Nick",
+  "Big P",
+  "Big Push",
+  "Bill Bailey",
+  "Bill's Belli",
+  "Bill's Hit Tune",
+  "Billie's Bounce",
+  "Billies Bounce",
+  "Bills' Hit Tune",
+  "Bimini",
+  "Bird Calls",
+  "Bird Feathers",
+  "Bird Food",
+  "Bird Of Beauty",
+  "Birdland",
+  "Birds Mother",
+  "Birds Of A Feather",
+  "Birk's Works",
+  "Birth Of The Blues",
+  "Bisquit Mix",
+  "Bitter Suite In The Ozone",
+  "Black",
+  "Black And Blue",
+  "Black And Tan Fantasy",
+  "Black Bats and Poles",
+  "Black Coffee",
+  "Black Diamond",
+  "Black Eyes",
+  "Black Ice",
+  "Black Monday",
+  "Black Narcissus",
+  "Black Nile",
+  "Black Orpheus",
+  "Blackbird",
+  "Blame It On My Youth",
+  "Blessed Relief",
+  "Blessing (The)",
+  "Blizzard Of Lies",
+  "Bloomdido",
+  "Blue 'N Boogie",
+  "Blue A La Mode",
+  "Blue And Sentimental",
+  "Blue Bayou",
+  "Blue Bossa",
+  "Blue Champagne)",
+  "Blue Comedy",
+  "Blue Concept",
+  "Blue Daniel",
+  "Blue Fable",
+  "Blue Hawk",
+  "Blue Haze",
+  "Blue in Green",
+  "Blue Lace",
+  "Blue Monk",
+  "Blue Moon",
+  "Blue Room",
+  "Blue Samba",
+  "Blue Seven",
+  "Blue Silver",
+  "Blue Skies",
+  "Blue Spirits",
+  "Blue Train",
+  "Blue Trane",
+  "Blue Tuesday",
+  "Blueberry Hill",
+  "Bluebird",
+  "Blues Backstage",
+  "Blues By Five",
+  "Blues Connotation",
+  "Blues For Alice",
+  "Blues For Jan",
+  "Blues For LJ",
+  "Blues For Pablo",
+  "Blues For Philly Joe",
+  "Blues For Willie",
+  "Blues For Wood",
+  "Blues For Yna Yna",
+  "Blues In A Closet",
+  "Blues In A Cold Water Flat",
+  "Blues In The Closet",
+  "Blues In The Night",
+  "Blues Minor",
+  "Blues On The Corner",
+  "Blues Peru",
+  "Blues The Most",
+  "Blues Walk",
+  "Bluesette",
+  "Boardwalk",
+  "Bob Movers Bossa Nova",
+  "Bockhanal",
+  "Body and Soul",
+  "Bohemia After Dark",
+  "Bolivia",
+  "Bones From Jones",
+  "Bongo Hop",
+  "Boo Boo Be Doop",
+  "Boogie Down",
+  "Boogie Stop Shuffle",
+  "Boogie Woogie (The Original)",
+  "Booker's Waltz",
+  "Boomerang",
+  "Bop Boy",
+  "Bop City",
+  "Bop Shop",
+  "Boplicity",
+  "Boplicity (Bebop Lives)",
+  "Born To Be Blue",
+  "Bossa Rokka",
+  "Boston Marathon",
+  "Both Sides Of The Coin",
+  "Bottoms Up",
+  "Bounce",
+  "Bouncin' With Bud",
+  "Bouncing With Bud",
+  "Boy Next Door",
+  "Boy What A Night",
+  "Brainville",
+  "Brazil",
+  "Brazilian Beat",
+  "Breakfast Wine",
+  "Breakfast With Joe",
+  "Breakin' Away",
+  "Breakthrough",
+  "Breeze And 1 (The)",
+  "Breezin'",
+  "Brian's Song",
+  "Brick House",
+  "Bridge Over Troubled Water",
+  "Bridgitte",
+  "Bright Blues",
+  "Bright Boy",
+  "Bright moments",
+  "Bright Size Life",
+  "Brilliant Corners",
+  "Broadway",
+  "Broadway Blues",
+  "Brothers Of The Bottom Row",
+  "Brown Eyed Girl",
+  "Brown Gold",
+  "Brown Skin Girl",
+  "Brownie Speaks",
+  "Brownout",
+  "Bruh Slim",
+  "Bu's Delight",
+  "Bud Powell",
+  "Bud's Blues",
+  "Bud's Bubble",
+  "Bud's Idea",
+  "Budo",
+  "Buhaina's Delight",
+  "Bulldog Blues",
+  "Bunko",
+  "Bunny",
+  "Busch-Wacked",
+  "Buster Rides Again",
+  "Bustin' Chops",
+  "Busy B's",
+  "But Beautiful",
+  "But Not For He",
+  "But Not for Me",
+  "Butch and Butch",
+  "Butterfly",
+  "Button Up Your Overcoat",
+  "Buzzy",
+  "By Myself",
+  "Bye Bye Baby",
+  "Bye Bye Blackbird",
+  "Bye Bye Blues",
+  "Bye-Ya",
+  "Byrdlike",
+  "C Jam Blues",
+  "C Minor Blues Chase",
+  "C.C. Rider",
+  "C.T.A.",
+  "Cady and Carole",
+  "Caf‚",
+  "Cairo",
+  "Caldonia",
+  "Call For All Demons",
+  "Can't Help Falling in Love",
+  "Can't Help Lovin' Dat Man",
+  "Can't Stop The Wind",
+  "Can't Take My Eyes Off You",
+  "Can't We Be Friends",
+  "Candy",
+  "Cantaloupe Island",
+  "Cantelope Island",
+  "Canyon Song",
+  "Cape Verdean Blues (The)",
+  "Capim",
+  "Captain Ahab",
+  "Captain Caribe",
+  "Captain Marvel",
+  "Caravan",
+  "Careful",
+  "Careless Love",
+  "Careless Whisper",
+  "Cariba",
+  "Caribbean Cutie",
+  "Carioca",
+  "Carnival",
+  "Carolina Moon 80 Cat Walk (The)",
+  "Casa de Luz",
+  "Casa Forte",
+  "Cascades",
+  "Cat",
+  "Catch Me",
+  "Catch The Wind",
+  "Cathy",
+  "Cedar's Blues",
+  "Celia",
+  "Centerpiece (Keester Parade)",
+  "Central Park West",
+  "Ceora",
+  "Certain Smile (A)",
+  "Chain of Fools",
+  "Chairs And Children",
+  "Chameleon",
+  "Champ (The)",
+  "Champ(The)",
+  "Change Of Mind",
+  "Change the World",
+  "Charcoal Blues",
+  "Chariots",
+  "Charles Christopher Parker",
+  "Charmaine",
+  "Charmed Circle",
+  "Chase The",
+  "Chase(The)",
+  "Chasin' The Train",
+  "Chasing The Bird",
+  "Cheek To Cheek",
+  "Cheese Cake",
+  "Chega de Saudade",
+  "Chega De Saudade (No More Blues)",
+  "Chelsea Bells",
+  "Chelsea Bridge",
+  "Cherokee",
+  "Cherokee (Indian Love Song)",
+  "Cheryl",
+  "Cheshire Cat Walk",
+  "Chesney",
+  "Chicago Song",
+  "Chick's Tune",
+  "Chicken Feathers",
+  "Chief Crazy Horse",
+  "Child Is Born",
+  "Children Of The Night",
+  "Children's Play Song",
+  "Children's Song",
+  "Chippie",
+  "Choices",
+  "Choo Choo Ch' Boogie",
+  "Christmas Song",
+  "Christmas Song (The)",
+  "Chromatic Tune",
+  "Chromazone",
+  "Chronic Blues",
+  "Chuckles",
+  "CIA",
+  "Circle",
+  "Circling The Blues",
+  "Circular Motion",
+  "Circumstantial",
+  "Cirrus",
+  "Cissy Strut",
+  "Clockwise",
+  "Close As Pages In A Book",
+  "Close Enough For Love",
+  "Close to You",
+  "Close Your Eyes",
+  "Cohn My Way",
+  "Cold Duck Time",
+  "Cold Sweat",
+  "Colors Of Chloe",
+  "Come Rain or Come Shine",
+  "Come Sunday",
+  "Come Together",
+  "Comes Love",
+  "Comin' Down",
+  "Comin' Home Baby",
+  "Comin' On The Hudson",
+  "Como En Vietnam",
+  "Compared to What",
+  "Compensation",
+  "Comrad Conrad",
+  "Comrade Conrad",
+  "Con Alma",
+  "Conception",
+  "Cone Pone",
+  "Conference of the Birds",
+  "Confessin (That I Love you)",
+  "Confirmation",
+  "Connies Bounce",
+  "Consternation",
+  "Contemplation",
+  "Contours",
+  "Cookin'",
+  "Cookin' At The Continental",
+  "Cool",
+  "Cool Blues",
+  "Cool Cat On A Hot Tin Roof",
+  "Cool Eyes",
+  "Cool Green",
+  "Cool Mix",
+  "Cool One (The)",
+  "Cooling It",
+  "Coral",
+  "Corcovado",
+  "Core (The)",
+  "Cork \"N\" Bib",
+  "Corner Pocket (Until I Met You)",
+  "Cote D'azur",
+  "Cottage For Salt (A)",
+  "Cotton Tail",
+  "Cottontail",
+  "Could It Be I'm Falling in Love",
+  "Could It Be You",
+  "Count Every Star",
+  "Countdown",
+  "Country Roads",
+  "Cousin Mary",
+  "Crazeology",
+  "Crazy Rhythm",
+  "Creek",
+  "Creepin",
+  "Creepin' In",
+  "Crepuscule With Nellis",
+  "Crescent",
+  "Crescent City",
+  "Crisis",
+  "Criss Cross",
+  "Criss/Cross",
+  "Cruising",
+  "Cry Me a River",
+  "Crystal",
+  "Crystal Silence",
+  "Cubano Chant",
+  "Cunga Black",
+  "Cute",
+  "Cyclic Episode",
+  "Cynthia",
+  "D Minor Mint",
+  "D'Jango",
+  "D.C. Farewell",
+  "Daa Houd",
+  "Daahoud",
+  "Dacapolypso",
+  "Daddy's Girl Cynthia",
+  "Dahomey Dance",
+  "Dakar",
+  "Dance Cadaverous",
+  "Dance Of The Infidels",
+  "Dancing In The Street",
+  "Dancing On The Ceiling",
+  "Dandy Line(A)",
+  "Darius Dance",
+  "Darn That Dream",
+  "Dat Dere",
+  "Day By Day",
+  "Day Dream",
+  "Day In Day Out",
+  "Day In The Life Of A Fool (A)",
+  "Day In Vienna",
+  "Day Waves",
+  "Days And Nights Waiting",
+  "Days of Wine and Roses",
+  "De Pois De Amor O'vazio",
+  "Dear Lord",
+  "Dear Old Stockholm",
+  "Dearly Beloved",
+  "Debbie",
+  "Deception",
+  "Decidedly",
+  "Decision",
+  "Dee Song",
+  "Dee's Dilemma",
+  "Deed I Do",
+  "Deep Purple",
+  "Del Sasser",
+  "Delevans",
+  "Delgado",
+  "Delilah",
+  "Delores",
+  "Deltitnu",
+  "Deluge",
+  "Desafinado",
+  "Desafinado (Slightly Out Of Tune)",
+  "Desert Air",
+  "Desert Moonlight",
+  "Desire",
+  "Desperado",
+  "Detour Ahead",
+  "Devil May Cape",
+  "Dewey Square",
+  "Dexter",
+  "Dexterity",
+  "Diablo's Dance",
+  "Diane",
+  "Did You Call Her Today",
+  "Didi",
+  "Didn't Cha Know",
+  "Dienda",
+  "Dig",
+  "Digits",
+  "Dilemma",
+  "Dimples",
+  "Dinah",
+  "Dindi",
+  "Displacement",
+  "Divertamento",
+  "Dizzy Atmosphere",
+  "Dizzy's Business",
+  "Django",
+  "Do Nothin' Till You Hear From Me",
+  "Do Nothing 'Til You Hear From Me",
+  "Do Nothing Till You Hear From Me",
+  "Do You Know What It Means (To Miss New Orleans",
+  "Do You Know What It Means To Miss New Orleans?",
+  "Doce Presenca",
+  "Dock of the Bay",
+  "Doggin' Around",
+  "Dogs In The Wine Shop",
+  "Doin' The Pig",
+  "Doin' The Thing",
+  "Doin' The Things",
+  "Dolphin Dance",
+  "Dolphin The",
+  "Domingo",
+  "Domino Biscuit",
+  "Don't Argue",
+  "Don't Ask Why",
+  "Don't Be That Way",
+  "Don't Blame Me",
+  "Don't Ever Go Away",
+  "Don't Explain",
+  "Don't Forget The Poet",
+  "Don't Get Around Much Anymore",
+  "Don't Go To Strangers",
+  "Don't Know Why",
+  "Don't Let The Sun Catch You Cryin'",
+  "Don't Look Back",
+  "Don't Stop Believin'",
+  "Don't Take Your Love From Me",
+  "Donna Lee",
+  "Doodlin",
+  "Doodlin'",
+  "Doors",
+  "Dot's Groovy",
+  "Double Clutching",
+  "Double Talk",
+  "Double Up (The)",
+  "Down",
+  "Down By The Riverside",
+  "Down For Double",
+  "Down Tempo",
+  "Doxy",
+  "Dr. Jeckyll",
+  "Dream Dancing",
+  "Dreamin",
+  "Dreams",
+  "Drive (The)",
+  "Duff",
+  "Duke (The)",
+  "Duke The",
+  "Duke's Sound Of Love",
+  "Dwellings",
+  "D‚j… vu",
+  "E.K.'s Blues",
+  "E.S.P.",
+  "E.T.A.",
+  "Eager Beaver",
+  "Earl (The)",
+  "Early",
+  "Early Autumn",
+  "Early Spring",
+  "East Coast Outpost",
+  "East of the Sun",
+  "Easy",
+  "Easy Living",
+  "Easy To Love",
+  "Eb Pob",
+  "Ebony Moonbeams",
+  "Ecaroh",
+  "Ecclusiastics",
+  "Eclipse (Henderson)",
+  "Eclipse (Mingus)",
+  "Eclypso",
+  "Edda",
+  "Edie McLin",
+  "Eiderdown",
+  "Eighth Day (The)",
+  "Eighty One",
+  "Ein Bein Strauss",
+  "Einbahnstrasse",
+  "El Gaucho",
+  "El Otono",
+  "El Toro",
+  "El Yorke",
+  "Elevation",
+  "Eleven Sixty",
+  "Elizete",
+  "Ellipsis (Helias)",
+  "Ellipsis (Rivers)",
+  "Elm",
+  "Elora",
+  "Elsa",
+  "Elvin Sir Jones",
+  "Emanon",
+  "Embraceable You",
+  "Emily",
+  "Empathy",
+  "Enchance",
+  "End Of A Love Affair",
+  "End Of A Love Affair (The)",
+  "End of the Road",
+  "Endangered Species",
+  "Endlessly",
+  "Englishman in New York",
+  "Epilogue",
+  "Epistrophy",
+  "Equinox",
+  "Equipoise",
+  "Ergo",
+  "Ericloth",
+  "Eronel",
+  "Escapade",
+  "Escher Sketch",
+  "Estate",
+  "Estimated Time Of Arrival",
+  "Eternal Child",
+  "Eternal Triange",
+  "Eternal Triangle",
+  "Ev'ry Time We Say Good Bye",
+  "Ev'ry Time We Say Goodbye",
+  "Evening In Concert",
+  "Evergreenish",
+  "Every Breath You Take",
+  "Every Now And Then",
+  "Every Time I See You",
+  "Everybody Loves My Baby",
+  "Everything Happens to Me",
+  "Everything I Have Is Yours",
+  "Everything I Love",
+  "Everything's Coming Up Roses",
+  "Everywhere",
+  "Evidence",
+  "Exactly Like You",
+  "Exercise #3",
+  "Exercise #6",
+  "Exodus",
+  "Expression",
+  "Eye Of The Hurricane",
+  "Ezz-thetic",
+  "Fables Of Faubus",
+  "Face Dancer",
+  "Failing In Love With Love",
+  "Fair Weather",
+  "Fall",
+  "Fall With Me",
+  "Falling Grace",
+  "Falling in Love with Love",
+  "Family Joy",
+  "Farkle Flakes",
+  "Farmers Market",
+  "Fat Lady",
+  "Fat Man (The)",
+  "Father",
+  "Favela",
+  "Feather Merchant",
+  "Fee-Fi-Fo-Fum",
+  "Feel Like Makin' Love",
+  "Feelin' Fine",
+  "Feelings And Things",
+  "Feels So Good",
+  "Felicidade(A)",
+  "Fell Like Makin' Love",
+  "Festive Minor",
+  "Fever",
+  "Fields of Gold",
+  "Fields We Know(The)",
+  "Fiesta In Blue",
+  "Fifty Second Street Theme",
+  "Figure 8",
+  "Filthy Mcnasty",
+  "Fine And Dandy",
+  "Fine And Mellow",
+  "Fine Romance",
+  "Fine Romance (A)",
+  "Fingers",
+  "Fire",
+  "First Light",
+  "First Moves",
+  "First Trip",
+  "Five",
+  "Five Brothers",
+  "Five Hundred Miles High",
+  "Five Spot After Dark",
+  "Five-Four Thing",
+  "Flags",
+  "Flamingo",
+  "Flash",
+  "Flim Flam",
+  "Flintstone's Theme",
+  "Flintstones",
+  "Florences Fantasy",
+  "Flower Is A Lonesome Thing (A)",
+  "Flowers For A Lady",
+  "Flugelin' The Blues",
+  "Fly By Night",
+  "Fly Me to the Moon",
+  "Flying Home",
+  "Foggy Day",
+  "Foggy Day (A)",
+  "Follow Your Heart",
+  "Fool That I Am",
+  "Foolkiller",
+  "Fools Rush In",
+  "Footprints",
+  "For All We Know",
+  "For Every Man There's A Woman",
+  "For Harry Carney",
+  "For Heavens Sake",
+  "For Heavens' Sake",
+  "For Miles And Miles",
+  "For Minors Only",
+  "For Nenette",
+  "For Once in My Life",
+  "For Regulars Only",
+  "For Sentimental Reasons",
+  "For Stompers Only",
+  "For the Love of You",
+  "For You For Me For Evermore",
+  "Forest Flower",
+  "Forever",
+  "Forgetful",
+  "Fortune Smiles",
+  "Four",
+  "Four Brothers",
+  "Four In One",
+  "Four Mothers",
+  "Four On Six",
+  "Four Others",
+  "Four Winds",
+  "Fox Hunt",
+  "Foxhorn Song",
+  "Fragile",
+  "Frank 'N Earnest",
+  "Frankie And Johnny",
+  "Freckles",
+  "Freddie Freeloader",
+  "Freddie Froo",
+  "Freddie The Freeloader",
+  "Free",
+  "Free Cell Block \"F\"",
+  "Free Fallin'",
+  "Free Wheeling",
+  "Freedom at Midnight",
+  "Freedom Jazz Dance",
+  "Freedomland",
+  "Freight Trane",
+  "French Spice",
+  "French Waltz",
+  "Friday Night At The Cadillac Club",
+  "Friday The 13th",
+  "Fried Bananas",
+  "Friends",
+  "Friends And Strangers",
+  "From Day To Day",
+  "From Now On",
+  "From the Heart",
+  "From This Moment On",
+  "Frosty The Snow Man",
+  "Fruit (The)",
+  "Fudgesicle Built For Four",
+  "Full Moon and Empty Arms",
+  "Fun Ride",
+  "Fun To Be Fooled",
+  "Funk Dumplin",
+  "Funk In Deep Freeze",
+  "Funkallero",
+  "Funky",
+  "Funny Man",
+  "Fuschia Swing Song",
+  "G Waltz",
+  "Gail",
+  "Games People Play",
+  "Gandolfo's Bounce",
+  "Gary's Notebook",
+  "Gary's Waltz",
+  "Gaslight",
+  "Gaviota",
+  "Gee Baby Ain't I Good To You",
+  "Gee Baby, Ain't I Good to You",
+  "Gemini",
+  "General Mojo's Well Laid Plan",
+  "Gentle Rain",
+  "Gentle Rain (The)",
+  "Gentle Wind And Falling Tear",
+  "Georgia",
+  "Georgia on My Mind",
+  "Geraldine",
+  "Gerry's Blues",
+  "Gertrude's Bounce",
+  "Get Happy",
+  "Get Out Of Town",
+  "Get Ready",
+  "Gettin' It Togetha",
+  "Getting To Know You",
+  "Ghost Of A Chance (A)",
+  "Giant Steps",
+  "Giaruja",
+  "Gibraltar",
+  "Giggin' And Drinkin",
+  "Gina",
+  "Ginseng People",
+  "Girl from Ipanema",
+  "Girl From Ipanema (The)",
+  "Girl Talk",
+  "Give Me the Night",
+  "Give Thanks",
+  "Gloria's Step",
+  "Glory Of Love (The)",
+  "Glow Worm (The)",
+  "Gnid",
+  "Gnu Blu",
+  "Go",
+  "God Bless the Child",
+  "God Bless' The Child",
+  "Godchild",
+  "Goin' Home",
+  "Goin' Out Of My Head",
+  "Golden",
+  "Golden Lady",
+  "Golden Notebooks",
+  "Gone With The Wind",
+  "Good Bait",
+  "Good Evening Mr. And Mrs.America",
+  "Good Life (The)",
+  "Good Man Is Hard To Find (A)",
+  "Good Morning Heartache",
+  "Good Spirits",
+  "Goodbye",
+  "Goodbye Pork Pie Hat",
+  "Goodbye Porkpie Hat",
+  "Goswell",
+  "Got A Match",
+  "Got A Match?",
+  "Got Eyes For You",
+  "Got to Be Real",
+  "Grand Central",
+  "Granted",
+  "Green Dolphin Street",
+  "Green Mountains",
+  "Greene St. Caper",
+  "Greensleeves",
+  "Greenwich",
+  "Gregory Is Here",
+  "Gringo (The)",
+  "Groove Merchant",
+  "Groove Yard",
+  "Groovin High",
+  "Groovin! High",
+  "Groovin' High",
+  "Groovus Mentus",
+  "Groovy Samba",
+  "Grow Your Own",
+  "Growing",
+  "Guatemala",
+  "Guess Who I Saw Today",
+  "Guijira",
+  "Gush",
+  "Gypsy (The)",
+  "H & H",
+  "H. And J.",
+  "Hackensack",
+  "Half Dozen (The)",
+  "Half Dozens (The)",
+  "Half Nelson",
+  "Hallelujah I Love Him (Her) So",
+  "Hallucinations",
+  "Hankerin",
+  "Happiness Is A Thing Called Joe",
+  "Happy Go Lucky Local (Night Train)",
+  "Happy Little Sunbeam",
+  "Happy Talk",
+  "Hard Eights",
+  "Harlem Nocturne",
+  "Harlequin",
+  "Harold's House Of Jazz",
+  "Hassan's Dream",
+  "Haunted Ballroom",
+  "Haunted Heart",
+  "Have You Met Miss Jones",
+  "Have You Met Miss Jones?",
+  "Havona",
+  "Hayseed",
+  "Head And Shoulders",
+  "Heard It Through the Grapevine",
+  "Heartsong",
+  "Heat Wave",
+  "Heaven",
+  "Hello",
+  "Hello Dolly!",
+  "Hello Young Lovers",
+  "Henninger Flats",
+  "Herbstone",
+  "Here's That Rainy Day",
+  "Here's That Sunny Day",
+  "Hershey Bar",
+  "Herzog",
+  "Hey There",
+  "Heyoke",
+  "Hi Beck",
+  "Hi-Fly",
+  "Hide And Seek",
+  "Hideaway",
+  "HiFly",
+  "High Fly",
+  "High Hopes",
+  "High Society",
+  "High Wire The Aerialist",
+  "Hip Bones",
+  "Hippy",
+  "Ho-Ba-La-La",
+  "Hocus Pocus",
+  "Hoe Down",
+  "Hold On I'm Coming",
+  "Hold Out Your Hand",
+  "Hold' Em Joe",
+  "Homage",
+  "Homestretch",
+  "Homework",
+  "Honesty",
+  "Honeysuckle Rose",
+  "Hooray For Love",
+  "Horacescope",
+  "Horizon",
+  "Hot House",
+  "Hotel California",
+  "Hotel Hello",
+  "Hotel Overture",
+  "Hotel Vamp",
+  "House Of Chan",
+  "House Of Jade",
+  "How About You",
+  "How Deep Is The Ocean",
+  "How Deep Is Your Love",
+  "How High the Moon",
+  "How Insensitive",
+  "How Long Has This Been Going On",
+  "How My Heart Sings",
+  "How Sweet It Is",
+  "Hullo Bolinas",
+  "Human Nature",
+  "Hummin",
+  "Humpty Dumpty",
+  "Hypochtistmutreefuzz",
+  "I Believe In You",
+  "I Can't Get Started",
+  "I Can't Give You Anything But Love",
+  "I Cant Get Started",
+  "I Cant Help It",
+  "I Concentrate On You",
+  "I Could Have Danced All Night",
+  "I Could Write a Book",
+  "I Cover The Waterfront",
+  "I Cried For You",
+  "I Didn't Know About You",
+  "I Didn't Know What Time It Was",
+  "I Don't Know Why (I just Do)",
+  "I Fall in Love Too Easily",
+  "I Feel Good",
+  "I Get A Kick Out Of You",
+  "I Get Along Without You Very Well",
+  "I Got It Bad",
+  "I Got Rhythm",
+  "I Hadn't Anyone Till You",
+  "I Hear a Rhapsody",
+  "I Heard It Through the Grapevine",
+  "I Just Called to Say I Love You",
+  "I Just Can't Stop Loving You",
+  "I Keep Forgettin'",
+  "I Know Don't Know How",
+  "I Left My Heart In San Francisco",
+  "I Let A Song Go Out Of My Heart",
+  "I Love Lucy",
+  "I Love Paris",
+  "I Love You",
+  "I Loves You Porgy",
+  "I Mean You",
+  "I Need YOU Here",
+  "I Only Have Eyes For You",
+  "I Remember April",
+  "I Remember Bird",
+  "I Remember Clifford",
+  "I Remember Duke",
+  "I Remember When (Si Tu Vois Me Mere)",
+  "I Remember You",
+  "I Say a Little Prayer",
+  "I Should Care",
+  "I Surrender Dear",
+  "I Thought About You",
+  "I Thought About Your",
+  "I Waited For You",
+  "I Wanna Be Where You Are",
+  "I Wanted To Say",
+  "I Will Wait For You",
+  "I Wish You Love",
+  "I Won't Be Back",
+  "I Won't Dance",
+  "I'll Always Be In Love With You",
+  "I'll Be Around",
+  "I'll Be Seeing You",
+  "I'll Close My Eyes",
+  "I'll Get By",
+  "I'll Get By (As Long As I Have You)",
+  "I'll Never Smile Again",
+  "I'll Remember April",
+  "I'll Take Romance",
+  "I'll Walk Alone",
+  "I'm A Pool To Want You",
+  "I'm Afraid",
+  "I'm All Smiles",
+  "I'm An Old Cowhand",
+  "I'm Beginning To See The Light",
+  "I'm Confessin' That I Love You",
+  "I'm Gettin' Sentimental Over You",
+  "I'm Getting Sentimental Over You",
+  "I'm Glad There Is You",
+  "I'm Gonna Sit Right Down And Write Myself A Letter",
+  "I'm In The Mood For Love",
+  "I'm Losing You",
+  "I'm Old Fashioned",
+  "I'm Old Fasihoned",
+  "I'm On My Way",
+  "I'm Sitting On Top Of The World",
+  "I'm Through With Love",
+  "I'm Your Pal",
+  "I've Found A New Baby",
+  "I've Got A Crush On You",
+  "I've Got Rhythm",
+  "I've Got The World On A String",
+  "I've Got You Under My Skin",
+  "I've Got Your Number",
+  "I've Grown Accustomed To Her Face",
+  "I've Grown Accustomed To Your Face",
+  "I've Heard That Song Before",
+  "I've Never Been In Love Before",
+  "Icarus",
+  "Ice Cream Konitz",
+  "Ictus",
+  "Ida Lupino",
+  "Idol Gossip",
+  "If Ever I Would Leave You",
+  "If I Ain't Got You",
+  "If I Loved You",
+  "If I Should Lose You",
+  "If I Were A Bell",
+  "If s All Right With Me",
+  "If You Could See Me Now",
+  "If You Don't Know Me by Now",
+  "If You Never Come To Me",
+  "III Wind",
+  "Ill Wind",
+  "Illuminados",
+  "Imagination",
+  "Imagine",
+  "Impressions",
+  "In A Capricornian Way",
+  "In A Cello Mood",
+  "In A Little Spanish Town",
+  "In a Mellow Tone",
+  "In A Mist",
+  "In a Sentimental Mood",
+  "In A Shanty In. Old Shanty Town",
+  "In A Silent Way",
+  "In And Out",
+  "In April",
+  "In Case You Haven't Heard",
+  "In Case You Missed It",
+  "In Don's Kitchen",
+  "In Her Family",
+  "In Love In Vain",
+  "In Love With Night",
+  "In Pursuit Of The 27th Man",
+  "In Salah",
+  "In The Blue Of Evening",
+  "In the Days of Our Love",
+  "in The Mode",
+  "In The Mood",
+  "In The Nick Of Time",
+  "In The Still Of The Night",
+  "In The Wee Small Hours Of The Morning",
+  "In Walked Bud",
+  "In Your Own Sweet Way",
+  "In Your Quiet Place",
+  "Incentive",
+  "Inchworm",
+  "Indian Club",
+  "Indian Lady",
+  "Indian Summer",
+  "Indiana",
+  "Inez",
+  "Infant Eyes",
+  "Inner Space",
+  "Inner Urge",
+  "Inside In",
+  "Inside Out",
+  "Intermission Riff",
+  "Interplay",
+  "Intrepid Fox",
+  "Introspection",
+  "Invisible (The)",
+  "Invitation",
+  "Iris",
+  "Irv's At Midnight",
+  "Is It Really True?",
+  "Is You Is Or Is You Ain't",
+  "Isabel The Liberator",
+  "Isfahan",
+  "Island Birdie",
+  "Isn't It a Pity",
+  "Isn't It Romantic",
+  "Isn't She Lovely",
+  "Isoar",
+  "Isotope",
+  "Israel",
+  "It Ain't Necessarily So",
+  "It All Comes Back To You",
+  "It Always Is",
+  "It Could Happen to You",
+  "It Could Only Happen With You",
+  "It Don't Mean a Thing",
+  "It Don't Mean A Thing (If It Ain't Got That Swing)",
+  "It Had To Be You",
+  "It Happens Every Day",
+  "It Might As Well Be Spring",
+  "It Never Entered My Mind",
+  "It's A Blue World",
+  "It's A Raggy Waltz",
+  "It's All Right With Me",
+  "It's Easy to Remember",
+  "It's Love - It's Christmas",
+  "It's Magic",
+  "It's Not For Me To Say",
+  "It's Only A Paper Moon",
+  "It's Sand Man",
+  "It's The Talk Of The Town",
+  "It's Tim Talk Of The Town",
+  "It's You",
+  "It's You Or No One",
+  "It's You Or No One For Me",
+  "Jackie",
+  "Jackleg",
+  "Jaco",
+  "Jacob's Ladder",
+  "Jaguar",
+  "Jam For Your Bread",
+  "Jammin' At The Jazzworks",
+  "Japanese Waltz",
+  "Jasmin",
+  "Jazz-Me Blues (The)",
+  "Jazzbo's Haunt",
+  "Je Ne Sais Pas",
+  "Jean De Fleur",
+  "Jeanie",
+  "Jeannie",
+  "Jeannine",
+  "Jeeps Blues",
+  "Jelly Roll",
+  "Jelly Roll Blues",
+  "Jersey Bounce",
+  "Jeru",
+  "Jessica",
+  "Jim",
+  "Jingle Bells",
+  "Jingle-Bell Rock",
+  "Jinrikisha",
+  "Jitterbug Waltz",
+  "Jive At Five",
+  "Jive Samba",
+  "Joanna",
+  "Jodo",
+  "Jody Grind",
+  "Joe Maini",
+  "John's Waltz",
+  "Johnny One Note",
+  "Johnny's Theme",
+  "Johnson Rag",
+  "Joint Is Jumpin (The)",
+  "Joint Is Jumpin' (The)",
+  "Jolly Jumps In",
+  "Jolly Lodger",
+  "Jor Du",
+  "Jordu",
+  "Jorgie's",
+  "Joshua",
+  "Joshua C.",
+  "Josie",
+  "Journey To Recife",
+  "Joy Spring",
+  "Joy To The World",
+  "Joyce's Samba",
+  "Juicy Lucy",
+  "Juke Box Saturday Night",
+  "Julian",
+  "Jump For Me",
+  "Jump Monk",
+  "Jumpin' With Symphony Sid",
+  "Jumping With Symphony Sid",
+  "June 15th 1967",
+  "June Is Bustin' Out All Over",
+  "June Night",
+  "Juntos",
+  "Just A Few",
+  "Just A-Sittin' and A-Rockin'",
+  "Just Around The Corner",
+  "Just By Myself",
+  "Just Friends",
+  "Just in Time",
+  "Just My Imagination",
+  "Just Once",
+  "Just One Of Those Things",
+  "Just Squeeze Me",
+  "Just the Two of Us",
+  "Just the Way You Are",
+  "Just You Just Me",
+  "K. C. Blues",
+  "Kahlil The Prophet",
+  "Kaleidoscope",
+  "Kary's France",
+  "Katrina Ballerina",
+  "Keep That Same Old Feeling",
+  "Kelo",
+  "Kentucky Oysters",
+  "Kicker (The)",
+  "Kids Are Pretty People",
+  "Kiki And Mingus",
+  "Killer Joe",
+  "Killing Me Softly",
+  "Killing Me Softly with His Song",
+  "King Porter Stomp",
+  "Knit for Mary F.",
+  "Knock On Wood",
+  "Knocks Me Off My Feet",
+  "Ko Ko",
+  "Kryptonite",
+  "L'il Darlin'",
+  "La Fiesta",
+  "La Mesha",
+  "La Mucura",
+  "La Nevada Blues",
+  "La Samba",
+  "La Vida Feliz",
+  "Ladies In Mercedes",
+  "Lady Be Good!",
+  "Lady Bird",
+  "Lady Day",
+  "Lady Is A Tramp",
+  "Lady Is A Tramp (The)",
+  "Lady J",
+  "Lady McGowan's Dream",
+  "Lady Sings The Blues",
+  "Lady's Blues",
+  "Ladybird",
+  "Lakes",
+  "Lament",
+  "Land Of Make Believe",
+  "Lands End",
+  "Landslide",
+  "Las Vegas Tango",
+  "Last First",
+  "Last Nite",
+  "Last Page (The)",
+  "Last Season",
+  "Last Time I Saw Paris (The)",
+  "Last Train From Overbrook",
+  "Lately",
+  "Laugh! Clown! Laugh!",
+  "Laura",
+  "Laurie",
+  "Laurie (The Dream)",
+  "Layla",
+  "Lazy Afternoon",
+  "Lazy Bird",
+  "Leap Of Faith",
+  "Lee",
+  "Lees Dance",
+  "Left Alone",
+  "Left Bank",
+  "Leila",
+  "Lennie's Pennies",
+  "Lennie-Bird",
+  "Leroy The Magician",
+  "Lester Leaps In",
+  "Lester Left Town",
+  "Let It Be",
+  "Let It Snow! Let It Snow! Let It Snow!",
+  "Let Me Be The One",
+  "Let The Good Times Roll",
+  "Let There Be Love",
+  "Let There Be You",
+  "Let's Call The Whole Thing Off",
+  "Let's Call This",
+  "Let's Cook One",
+  "Let's Cool One",
+  "Let's Fall In Love",
+  "Let's Get Away From It All",
+  "Let's Get It On",
+  "Let's Go Dancin'",
+  "Let's Stay Together",
+  "Lets Eat",
+  "Lets Stay Together",
+  "Letter To Evan",
+  "Li'l Darlin",
+  "Liberated Brother",
+  "Licea",
+  "Lie Awake",
+  "Lies",
+  "Life Is just A Bowl Of Cherries",
+  "Light As A Feather",
+  "Light Blue",
+  "Light My Fire",
+  "Like A Lover",
+  "Like Father Like Son",
+  "Like No Other",
+  "Like Someone in Love",
+  "Like Sonny",
+  "Lil's Paradise",
+  "Lillie",
+  "Limbo",
+  "Limehouse Blues",
+  "Limelight",
+  "Line For Lyons",
+  "Linger Awhile",
+  "Lion's Den",
+  "Lisa",
+  "Lisa (Feldman)",
+  "Lisa (Montolieu)",
+  "Litha",
+  "Little B's Poem",
+  "Little Boat",
+  "Little Chicago Fire",
+  "Little Duet (A)",
+  "Little Face",
+  "Little Girl",
+  "Little Girl Blue",
+  "Little Linda",
+  "Little Melonae",
+  "Little Niles",
+  "Little Rootie Tootie",
+  "Little Sheri",
+  "Little Sunflower",
+  "Little Susan",
+  "Little Sweet(A)",
+  "Little Taste(A)",
+  "Little Tear (A)",
+  "Little Waltz",
+  "Little Willie Leaps",
+  "Little Wind",
+  "Liturgy",
+  "Local 802 Blues",
+  "Local Blues",
+  "Locomotion",
+  "Lodgellian Mode",
+  "Lone Jack",
+  "Lonely Dreams",
+  "Lonely Town",
+  "Lonely Woman",
+  "Long Ago & Far Away",
+  "Long Ago (And Far Away)",
+  "Long Ago And Far Away",
+  "Long As You Know You're Living Yours",
+  "Long Train Runnin'",
+  "Long View (The)",
+  "Long Yellow Road",
+  "Lonnie's Lament",
+  "Look At The Birdie",
+  "Look For The Silver Lining",
+  "Look To The Sky",
+  "Looking Back",
+  "Loop (The)",
+  "Loose Bloose",
+  "Loose Ends",
+  "Lost",
+  "Lost In The Stars",
+  "Lost Love",
+  "Lot Of Livin' To Do (A)",
+  "Lotus On Irish Streams",
+  "Loud-Zee",
+  "Louise",
+  "Louisiana",
+  "Love Came On Stealthy Fingers",
+  "Love Dance",
+  "Love for Sale",
+  "Love Letter",
+  "Love Me Tender",
+  "Love Poem",
+  "Love Vibrations",
+  "Love Walked In",
+  "Love's Haunts",
+  "Lovely Day",
+  "Lover",
+  "Lover Man",
+  "Lover Man (Oh Where Can You Be?)",
+  "Lovers Rain Dance",
+  "Loxodrome",
+  "Lucky Southern",
+  "Lullaby In Rhythm",
+  "Lullaby of Birdland",
+  "Lullaby Of The Leaves",
+  "Lulu's Back In Town",
+  "Luminescence",
+  "Lunar Tune",
+  "Lunarcy",
+  "Lush Life",
+  "Lydian April",
+  "Lydian Dream",
+  "Lyresto",
+  "Macpherson Struts Again",
+  "Mad About Him Sad Without Him",
+  "Mad About The Boy",
+  "Madagascar",
+  "Mademoiselle Mabry",
+  "Madison Avenue",
+  "Magician In You The",
+  "Mahjong",
+  "Maid In Mexico",
+  "Maiden Voyage",
+  "Maidens Of Cadiz",
+  "Majoong",
+  "Make It with You",
+  "Make Me A Memory (Sade Samba)",
+  "Make Someone Happy",
+  "Makin' Whoopee",
+  "Malaguena",
+  "Mallet Man",
+  "Mamacita",
+  "Mambo Del Crow",
+  "Man",
+  "Man Facing. North",
+  "Man I Love (The)",
+  "Man In The Green Shirt",
+  "Man in the Mirror",
+  "Man That Got Away (The)",
+  "Mandala",
+  "Manha de Carnaval",
+  "Manha De Carneval",
+  "Manhattan",
+  "Manteca",
+  "Maple Leaf Rag",
+  "Maputo",
+  "Margerine",
+  "Margie",
+  "Marie Antoinette",
+  "Marilia",
+  "Marionette",
+  "Marmaduke",
+  "Martians Go Home",
+  "Mary's Blues",
+  "Mas Que Nada",
+  "Masquerade",
+  "Masqularo",
+  "Matinee Idol",
+  "Mating Call",
+  "Matrix",
+  "Maxine",
+  "May Dance",
+  "May-Reh",
+  "May-Rey",
+  "Mayreh",
+  "Mean Lene",
+  "Mean To Me",
+  "Mean You",
+  "Meaning Of The Blues",
+  "Meditation",
+  "Meditaton",
+  "Meet Mr. Gordon",
+  "Mellophone Mambo",
+  "Mellow Mood",
+  "Memo To Maurice",
+  "Memo's Blues",
+  "Memories Of Tomorrow",
+  "Memories Of You",
+  "Memphis In June",
+  "Memphis Underground",
+  "Menina Flor",
+  "Mercy Mercy Me",
+  "Mercy Mercy Mercy",
+  "Merry Christmas Baby",
+  "Metamorphosis",
+  "Mevlevia",
+  "MI Boj A Samba",
+  "Michele's Meditation",
+  "Michelle",
+  "Midgets",
+  "Midland",
+  "Midnight Blue",
+  "Midnight Mood",
+  "Midnight Silence",
+  "Midnight Sun",
+  "Milano",
+  "Miles Ahead",
+  "Miles Mode",
+  "Milestones",
+  "Mine Is Yours",
+  "Minha Saudade",
+  "Minor Blues",
+  "Minor Mishap",
+  "Minor Mood",
+  "Minor Strain",
+  "Minor Swing",
+  "Minor's Holiday",
+  "Minority",
+  "Miss Ann (I & 2)",
+  "Miss Jackies Delight",
+  "Miss Premise",
+  "Misterioso",
+  "Misty",
+  "Miyako",
+  "Mo' Joe",
+  "Moak's Shop",
+  "Moanin'",
+  "Modadji",
+  "Modesty Blues",
+  "Mohawk",
+  "Molten Glass",
+  "Moment To Moment",
+  "Moment's Notice",
+  "Moments Notice",
+  "Mona Lisa",
+  "Monk On The Run",
+  "Monk's Mood",
+  "Monk's Sphere",
+  "Monkey's Uncle",
+  "Monking Business",
+  "Monks Dream",
+  "Monster & The Flower",
+  "Montage",
+  "Monti Celli",
+  "Mood For Maude",
+  "Mood Indigo",
+  "Moon And Sand",
+  "Moon Germs",
+  "Moon Glow",
+  "Moon Love",
+  "Moon Rays",
+  "Moon River",
+  "Moonchild",
+  "Moondance",
+  "Moonglow",
+  "Moonlight And Roses",
+  "Moonlight Bay",
+  "Moonlight Cocktail",
+  "Moonlight In Vermont",
+  "Moonlight On The Ganges",
+  "Moonlight Serenade",
+  "Moonrays",
+  "Moontide",
+  "Moontrane",
+  "Moose The Mooche",
+  "More",
+  "More I See You(The)",
+  "More Love",
+  "More Than Words",
+  "More Than You Know",
+  "Mornin'",
+  "Morning",
+  "Morning Dance",
+  "Morning Sprite",
+  "Morpo",
+  "Motel",
+  "Moten Swing",
+  "Moten's Swing",
+  "Mother Of The Dead Man",
+  "Motion",
+  "Mountain Dance",
+  "Mountain Greenery",
+  "Move",
+  "Movin' Along",
+  "Movin' In Movin'Out",
+  "Moving Out",
+  "Mozambique",
+  "Mr. Broadway Theme From",
+  "Mr. Clean",
+  "Mr. Gone",
+  "Mr. Jin",
+  "Mr. Jones",
+  "Mr. Kenyata",
+  "Mr. Magic",
+  "Mr. Misha And Little Lilly",
+  "Mr. P.C.",
+  "Mr. Sims",
+  "Mrs. Miniver",
+  "Ms. P & P",
+  "Muddy In The Bank",
+  "Muezzin",
+  "Muezzin'",
+  "Mumbles",
+  "My Attorney Bernie",
+  "My Baby Just Cares For Me",
+  "My Bells",
+  "My Favorite Things",
+  "My Flamingo",
+  "My Foolish Heart",
+  "My Funny Valentine",
+  "My Girl",
+  "My Heart Belongs To Daddy",
+  "My Heart Stood Still",
+  "My Ideal",
+  "My Little Boat",
+  "My Little Suede Shoes",
+  "My Mama Don Tol' Me",
+  "My Man's Gone Now",
+  "My Melancholy Baby",
+  "My Monday Date",
+  "My Old Flame",
+  "My One and Only Love",
+  "My Prayer",
+  "My Romance",
+  "My Shining Hour",
+  "My Ship",
+  "Myako",
+  "Mysterious Traveler",
+  "Mystery",
+  "Mystic Touch",
+  "Mystique",
+  "Myth",
+  "N.Y.C.'s No Lark",
+  "Naima",
+  "Nancy Joe",
+  "Nancy With The Laughing Face",
+  "Napanoch",
+  "Nardis",
+  "Natural Selection",
+  "Nature Boy",
+  "Neal's Blues",
+  "Nearness",
+  "Nearness Of You",
+  "Nefertiti",
+  "Nerfertiti",
+  "Never Alone",
+  "Never Givin' Up",
+  "Never Let Me Go",
+  "Never Make Your Move Too Soon",
+  "Never Said (Chan's Song)",
+  "Never Too Much",
+  "Never Will I Marry",
+  "Nevertheless (I'm In Love With You)!",
+  "New \"\"Frankie And Johnnie Song (The)\"",
+  "New Bag Blues",
+  "New Boots",
+  "New Kid in Town",
+  "New Thing",
+  "New York Afternoon",
+  "New York State of Mind",
+  "Newcomer",
+  "Next Future",
+  "Nica's Dream",
+  "Nica's Tempo",
+  "Nice 'N Easy",
+  "Nice Work If You Can Get It",
+  "Nick's Knacks",
+  "Nigerian Marketplace",
+  "Night and Day",
+  "Night Dreamer",
+  "Night Has A Thousand Eyes",
+  "Night In Tunesia(A)",
+  "Night In Tunisia(A)",
+  "Night Lake",
+  "Night Life",
+  "Night Train",
+  "Night Train (Happy Go Lucky Local)",
+  "Night We Called It A Day",
+  "Nightingale Sang In Berkeley Square(A)",
+  "Nightmood (Leinbra)",
+  "Nights At The Turntable",
+  "Nimbus",
+  "Nippon Soul",
+  "No Diggity",
+  "No Me Esqueca",
+  "No Moe",
+  "No Moon At All",
+  "No More Blues",
+  "No Splice",
+  "No Ties",
+  "No Way Out",
+  "No. 251",
+  "Nobody Else But Me",
+  "None But The Lonely Heart",
+  "Nonsequence",
+  "North Atlantic Run",
+  "Nostalgia In Times Square",
+  "Not Ethiopia",
+  "Not Really The Blues",
+  "Nothing Personal",
+  "November 68th",
+  "November Afternoon",
+  "Now He Beats The Drum-Now He Stops",
+  "Now He Sings",
+  "Now He Sings Now he Sobs",
+  "Now Is The Time",
+  "Now's the Time",
+  "Nowhere To Run",
+  "Nuages",
+  "Number 4",
+  "Number 6",
+  "Nutty Pine",
+  "Nutville",
+  "O Go Mo",
+  "O Pato",
+  "Oblivion",
+  "Obsequious",
+  "Ode To A Flugelhorn",
+  "Ode To Tee Doo Da Day",
+  "Off Flow",
+  "Off Minor",
+  "Off To The Races",
+  "Offshore",
+  "Oh Lady Be Good",
+  "Oh No",
+  "Oh Play That Thing",
+  "Oh What A Beautiful Mornin'",
+  "Oh You Crazy Moon",
+  "Oh! Look At Me Now",
+  "Oh! What It Seemed To Be",
+  "Oh! You Beautiful Doll",
+  "Ol' Man River",
+  "Old Devil Moon",
+  "Old Folks",
+  "Ole",
+  "Oleo",
+  "Olhos De Gato",
+  "Olinoqui Valley",
+  "On A Clear Day",
+  "On A Clear Day (You Can See Forever)",
+  "On A Little Street In Singapore",
+  "On A Misty Night",
+  "On A Slow Boat To China",
+  "On Broadway",
+  "On Green Dolphin Street",
+  "On The Quee-Tee",
+  "On The Scene",
+  "On The Sly",
+  "On The Stairs",
+  "On The Street Where You Live",
+  "On the Sunny Side of the Street",
+  "On The Trail",
+  "Once I Loved",
+  "Once In A While",
+  "Once In Awhile",
+  "Once Upon A Summertime",
+  "One Bird One Stone",
+  "One By One",
+  "One Family",
+  "One Finger Snap",
+  "One Foot In The Gutter",
+  "One For Daddy-O",
+  "One For Helen",
+  "One For My Baby",
+  "One For My Baby(And One More For The Road)",
+  "One Mint Julep",
+  "One Note Samba",
+  "One Note Sambaa",
+  "One With One",
+  "Onion Bottom",
+  "Only Child",
+  "Only You Know",
+  "Ontet",
+  "Ooo Baby Baby",
+  "Open Country",
+  "Open Your Eyes You Can Fly",
+  "Opener (The)",
+  "Oppornockity Tunes But Once",
+  "Opus 3 (Charles Mingus)",
+  "Opus 4 (Charles Mingus)",
+  "Opus De Funk",
+  "Opus One",
+  "Orange Was The Color Of Her Dress",
+  "Orbit",
+  "Orbit (Unless It's You)",
+  "Orbits",
+  "Orchids In The Moonlight",
+  "Organ Grinder",
+  "Organ Grinder(The)",
+  "Original Untitled Ballad",
+  "Ornithology",
+  "Our Delight",
+  "Our Love Is Here To Stay",
+  "Our Man Higgins Man",
+  "Out",
+  "Out A Day",
+  "Out Back",
+  "Out Back Of The Barn",
+  "Out of Nowhere",
+  "Out Of Somewhere",
+  "Out Of The Night",
+  "Out Of This World",
+  "Out There",
+  "Out To Lunch",
+  "Outlaw (The)",
+  "Outstanding",
+  "Over The Rainbow",
+  "Overjoyed",
+  "Ow",
+  "Ow!",
+  "Oye Como Ya",
+  "Oz",
+  "P.Y.T.(Pretty Young Thing)",
+  "Palermo Walk",
+  "Palo-Alto",
+  "Pamela's Passion",
+  "Panhandle Hook",
+  "Pannonic",
+  "Papa Lips",
+  "Paper Doll",
+  "Parisian Thoroughfare",
+  "Parisienne Thorofare",
+  "Parker 51",
+  "Parker's Mood",
+  "Part-Time Lover",
+  "Partido Alto",
+  "Party's Over (The)",
+  "Pass It On",
+  "Passion Dance",
+  "Passport",
+  "Pat 'N' Chat",
+  "Pats New Samba",
+  "Patterns",
+  "Patti-Cake",
+  "Patz Blues",
+  "Paul's Pal",
+  "Pawnee Junction",
+  "Peace",
+  "Peace Piece",
+  "Peaches 'N Cream",
+  "Peaches En Regalia",
+  "Peanut Vendor (The)",
+  "Pearlie's Swine",
+  "Pedro's Time",
+  "Pee Wee",
+  "Peel Me A Grape",
+  "Peep",
+  "Peg",
+  "Peggy's Blue Skylight",
+  "Pendulum",
+  "Pennies From Heaven",
+  "Penny Arcade",
+  "Pensativa",
+  "Pent Up House",
+  "Pent-Up House",
+  "People",
+  "People Get Ready",
+  "People Will Say We're In Love",
+  "Perdido",
+  "Perdido Line",
+  "Peresina",
+  "Perfect Love Jamala",
+  "Perhaps",
+  "Peri's Scope",
+  "Pernod",
+  "Pesky Serpent (The)",
+  "Pete's Meat",
+  "Petite Fleure",
+  "Petits Machins",
+  "Pfrancing",
+  "Pfrancing (No Blues)",
+  "Phase Dance",
+  "Philly Mignon",
+  "Picadilly Lilly",
+  "Pick Up the Pieces",
+  "Pick Yourself Up",
+  "Picture Of Health",
+  "Pimlico",
+  "Ping Pong",
+  "Pinocchio",
+  "Pirouette",
+  "Pithycanthropus Erectus",
+  "Plain Jane",
+  "Played Twice",
+  "Playground",
+  "Plaza Real",
+  "Plight",
+  "Ploinciana",
+  "Poinciana (Song Of The Tree)",
+  "Point Of Return",
+  "Polka Dots and Moonbeams",
+  "Polkadots And Moonbeams",
+  "Pompton Turnpike",
+  "Pools",
+  "Poor Butterfly",
+  "Popo",
+  "Port Rico Rock",
+  "Portrait Of Jennie",
+  "Portrait Of Tracy",
+  "Portsmouth Figurations",
+  "Pot Luck",
+  "Powder Puff",
+  "Power Play",
+  "Pragression",
+  "Preacher (The)",
+  "Prelude to a Kiss",
+  "Pretty Girl Is Like A Melody(A)",
+  "Prime Rib",
+  "Prince Albert",
+  "Prince Of Darkness",
+  "Prism",
+  "Prodefunctus",
+  "Prologue",
+  "Promenade",
+  "Promise",
+  "Punjab",
+  "Pure Imagination",
+  "Pursuance",
+  "Pussy Cat Dues",
+  "Put It Where You Want It",
+  "Put On A Happy Face",
+  "Put Your Little Foot Right Out",
+  "Pyramid",
+  "Quartet No. 2 Part 2",
+  "Quasimado",
+  "Quasimodo",
+  "Question Mark",
+  "Quick Step",
+  "Quicksilver",
+  "Quiet Fire",
+  "Quiet Girl",
+  "Quiet Nights of Quiet Stars",
+  "Quiet Nights Of Quiet Stars (Corcovado)",
+  "Quiet Now",
+  "Quiet Place(A)",
+  "Quintessence",
+  "Quintile",
+  "R.F.K.",
+  "R.J.",
+  "Ragamuffin",
+  "Rahsaan's Run",
+  "Rain",
+  "Rain In Spain (The)",
+  "Rain Waltz",
+  "Rainbow Seeker",
+  "Raincheck",
+  "Rainland",
+  "Ramblin'",
+  "Random Thoughts",
+  "Rapture",
+  "Rapuzel",
+  "Rattler's Groove",
+  "Raven (The)",
+  "Re-Re",
+  "Re: Person I Knew",
+  "Re; Person I Knew",
+  "Reach Out; I'll Be There",
+  "Ready Rudy",
+  "Real Guitarist",
+  "Real Life",
+  "Rebel Without A Cause",
+  "Recado Bossa Nova",
+  "Receipt Please",
+  "Recorda-Me",
+  "Recordame",
+  "Red Baron",
+  "Red Clay",
+  "Red Cross",
+  "Red Door (The)",
+  "Red Sails In The Sunset",
+  "Red Top",
+  "Red's Blues",
+  "Reflections",
+  "Reincarna11on Of A Lovebird",
+  "Reincarnation Blues",
+  "Reincarnation Of A Lovebird",
+  "Relaxin",
+  "Relaxin' At Carmarillo",
+  "Relentless",
+  "Remark You Made",
+  "Remember Hymn",
+  "Remember Rockefeller At Attica",
+  "Remembering The Rain",
+  "Resolution",
+  "Resonant Emotions",
+  "Respect",
+  "Retsim B",
+  "Revelation",
+  "Reverie",
+  "Rhyth-A-Ning",
+  "Rhythm-A-Ning",
+  "Ribbon in the Sky",
+  "Richards Tune",
+  "Rick's Tricks",
+  "Riddles",
+  "Rio",
+  "Rio Funk",
+  "Riot",
+  "Ritual",
+  "River",
+  "River People",
+  "Riviera",
+  "Road Song",
+  "Robbin's Nest",
+  "Robbins' Nest",
+  "Rock Steady",
+  "Rock-A-Bye Your Baby With A Dixie Melody",
+  "Rocker",
+  "Rockin' Chair",
+  "Room 335",
+  "Room 608",
+  "Rosanna",
+  "Rosetta",
+  "Rosewood",
+  "Rotation",
+  "Rouge",
+  "Round Midnight",
+  "'Round Midnight",
+  "Round Trip",
+  "Route 4",
+  "Route 66",
+  "Roxanne",
+  "Royal Garden Blues",
+  "Rubberneck",
+  "Ruby",
+  "Ruby My Dear",
+  "Ruby, My Dear",
+  "Run for Cover",
+  "Rush Hour",
+  "Russ job",
+  "Rustic Hop",
+  "'S Matter",
+  "S-H-I-N-E",
+  "S.O.S.",
+  "Sabra",
+  "Sack 0' Woe",
+  "Sack Of Woe",
+  "Sad Eyes",
+  "Sadiga",
+  "Safari",
+  "Saga Of Harrison Crabpeathers",
+  "Sail Away",
+  "Sailing At Night",
+  "Saint James Infirmary",
+  "Saint Thomas",
+  "Salt Peanuts",
+  "Salute To Charlie Christian",
+  "Salute To The Bandbox",
+  "Sam's Tune",
+  "Samantha's Bossa",
+  "Samba de Orfeu",
+  "Samba De Orpheus",
+  "Samba Du Bois",
+  "Sambacide",
+  "Same Shame",
+  "Sandu",
+  "Sans Souci",
+  "Santurce",
+  "Sara Smile",
+  "Sascha's Tune",
+  "Satellite",
+  "Satin Doll",
+  "Saturday Night Fish Fry",
+  "Save Your Love For Me",
+  "Saving All My Love for You",
+  "Scene Is Clean (The)",
+  "Schizophrenia",
+  "Scotch 'N' Soda",
+  "Scotch And Water",
+  "Scourn'",
+  "Scrapple from the Apple",
+  "Scrapple The Apple",
+  "Sea Journey",
+  "Seabrook Revisited",
+  "Search For Peace",
+  "Seaside",
+  "Second Hand Rose",
+  "Secret Love",
+  "Section Blues",
+  "Seeds Of Sin",
+  "Seems To Me",
+  "Self Portrait In 3 Colors",
+  "Self Portrait In Three Colors",
+  "Semblence",
+  "Send One Your Love",
+  "Senor Blues",
+  "Sentimental jorney",
+  "September",
+  "September In The Rain",
+  "September Song",
+  "Serenade To A Bus Beat",
+  "Serenade To A Bus Seat",
+  "Serenade To A Cuckoo",
+  "Serenade To A Soul Sister",
+  "Serenata",
+  "Serene",
+  "Serenity",
+  "Sermonette",
+  "Serpent's Tooth",
+  "Seven Come Eleven",
+  "Seven Steps to Heaven",
+  "Seventeen West",
+  "Seventh Avenue",
+  "Sextet",
+  "Sexual Healing",
+  "Sey40r Mouse",
+  "Shades Of Light",
+  "Shadow Of Your Smile",
+  "Shake Rattle And Roll",
+  "Shaker Song",
+  "Shaky Jake",
+  "Shank's Pranks",
+  "Shaw 'Nuff",
+  "Shaw Nuff",
+  "Shawnuff",
+  "She's Always a Woman",
+  "She's Funny That Way",
+  "Sheba",
+  "Sheik Of Araby (The)",
+  "Shifting Down",
+  "Shining Star",
+  "Shiny Stockings",
+  "Shirley",
+  "Shivers",
+  "Shoo Fly Pie And Apple Pan Dowdy",
+  "Short Count",
+  "Short Politician",
+  "Short Riff",
+  "Short Stop",
+  "Short Story",
+  "Show-Type Tune",
+  "Shutter Bug",
+  "Si Si",
+  "Sid's Ahead",
+  "Side By Side)",
+  "Sidewinder",
+  "Signal",
+  "Signed, Sealed, Delivered",
+  "Silver's Serenade",
+  "Silverware",
+  "Simbah",
+  "Simone",
+  "Simple Matter Of Conviction (A)",
+  "Simple Samba",
+  "Simple Waltz",
+  "Since We Met",
+  "Sing Me Softly Of The Blues",
+  "Sing No Blues",
+  "Sippin' At Bell's",
+  "Sir Duke",
+  "Sister Sadie",
+  "Sixth Sense",
+  "Skating In Central Park",
+  "Skippy",
+  "Skippy-Ing",
+  "Sky Dive",
+  "Skylark",
+  "Skyliner",
+  "Sleepin' Bee",
+  "Sleeping Bee",
+  "Sleepy Bop",
+  "Slipped Disc",
+  "Slow Boat To China",
+  "Slow; Hot; Wind",
+  "Slowly Gone Bygone",
+  "Small Day Tomorrow",
+  "Small World",
+  "Smatter",
+  "Smile",
+  "Smile Please",
+  "Smoke Gets In Your Eyes",
+  "Smoke Rings",
+  "Smooth One (A)",
+  "Smooth Operator",
+  "Snapper",
+  "Sno Peas",
+  "Snowfall",
+  "So Amazing",
+  "So Danco Samba",
+  "So Dolt",
+  "So In Love",
+  "So Many Stars",
+  "So Near So Far",
+  "So Nice (Sumer Sumamba)",
+  "So Sorry Please",
+  "So What",
+  "Social Call",
+  "Soft Shoe",
+  "Soft Winds",
+  "Softly As A Morning Sunrise",
+  "Softly As In A Morning Sunrise",
+  "Softly, as in a Morning Sunrise",
+  "Solar",
+  "Solitude",
+  "Solo Flight",
+  "Some Day My Prince Will Come",
+  "Some Enchanted Evening",
+  "Some Nerve",
+  "Some Of These Days",
+  "Some Other Blues",
+  "Some Other Time",
+  "Some Skunk Funk",
+  "Someday My Prince Will Come",
+  "Someone To Light Up My Life",
+  "Someone To Watch Over Me",
+  "Something",
+  "Something Different",
+  "Something Everywhere",
+  "Something For Lisa",
+  "Something From Everyone",
+  "Sometime Ago",
+  "Sometimes I'm Happy",
+  "Somewhere Before",
+  "Somewhere Over The Rainbow",
+  "Son Of Mr. Green Genes",
+  "Song",
+  "Song For Bilbad",
+  "Song For Helen",
+  "Song For Lorraine",
+  "Song for My Father",
+  "Song For My Lady",
+  "Song For Nicholas(A)",
+  "Song For Sisyphus",
+  "Song Is You",
+  "Song Is You (The)",
+  "Song Of The Islands",
+  "Songbird (Thank You for Your Lovely Song)",
+  "Sonja's Sanfona",
+  "Sonny Boy",
+  "Sonny Side",
+  "Sonny Speaks",
+  "Sonnymoon For Two",
+  "Soon",
+  "Soothsayer (The)",
+  "Sophisticated Lady",
+  "Sorcerer",
+  "Sorcerer (The)",
+  "SOS",
+  "Soul Eyes",
+  "Soul Sauce (Wachi Wara)",
+  "Soul Surge",
+  "Soultrane",
+  "Sound Down",
+  "Sound For Sore Ears(A)",
+  "Sound Lee",
+  "Sound Track",
+  "South Of The Border",
+  "South Street Exit",
+  "Southern Comfort",
+  "Space Circus Part 1",
+  "Space Circus Part 2",
+  "Spacemen",
+  "Spain",
+  "Speak Like A Child",
+  "Speak Low",
+  "Speak No Evil",
+  "Spectacular",
+  "Spiral",
+  "Spiral Dance",
+  "Spirit Samba",
+  "Split Kick",
+  "Spontaneous Combustion",
+  "Sporty",
+  "Sposin'",
+  "Spring Can Really Hang You Up The Most",
+  "Spring Is Here",
+  "Spring Will Be A Little Late This Year",
+  "Squeeze Me",
+  "Squirrel",
+  "Squirrel (The)",
+  "St. Thomas",
+  "Stablemates",
+  "Stairway to Heaven",
+  "Stairway To The Stars",
+  "Stand by Me",
+  "Star Dust",
+  "Star Eyes",
+  "Star-Crossed Lovers",
+  "Stardust",
+  "Stargazer",
+  "Stars Fall On Alabama",
+  "Stars Fell On Alabama",
+  "Stay As Sweet As You Are",
+  "Steepian Faith",
+  "Steeple Chase",
+  "Steeplechase",
+  "Stella by Starlight",
+  "Step Lightly",
+  "Stepping Stone",
+  "Steps",
+  "Sticks",
+  "Sticks And Stems",
+  "Sticky Wicket",
+  "Still",
+  "Stockholm Sweetnin",
+  "Stockholm Sweetnin'",
+  "Stolen Moments",
+  "Stompin' At The Savoy",
+  "Stop Time",
+  "Stopstart",
+  "Stormy Weather",
+  "Story Line",
+  "Straight Ahead",
+  "Straight Life",
+  "Straight No Chaser",
+  "Straight Street",
+  "Straight Up And Down (Corea)",
+  "Straight Up And Down (Dolphy)",
+  "Straight, No Chaser",
+  "Strange Fruit",
+  "Strangers In The Night",
+  "Strayhorn 2",
+  "Street Life",
+  "Street Louis Blues",
+  "Street Of Dreams",
+  "String Of Pearls (A)",
+  "Strode Rode",
+  "Strollin",
+  "Strollin'",
+  "Struttin' With Some Bar-B-Q",
+  "Struttin' With Some Barbeque",
+  "Stuff",
+  "Stuffy",
+  "Sub Aqua",
+  "Sub-Conscious-Lee",
+  "Sudden Samba",
+  "Sudwest Funk",
+  "Sues Changes",
+  "Sugar",
+  "Sugar Foot Stomp",
+  "Summer In Central Park",
+  "Summer Knows (The)",
+  "Summer Night",
+  "Summer Samba",
+  "Summer Setting",
+  "Summer Time",
+  "Summertime",
+  "Sunday Kind Of Love (A)",
+  "Sunny",
+  "Sunny Side Of The Street",
+  "Sunny Side Up",
+  "Sunrise Serenade",
+  "Sunrunner",
+  "Sunshine Express",
+  "Sunshower",
+  "Super Blue",
+  "Superstition",
+  "Surf Ride",
+  "Surrey With The Fringe On Top (The)",
+  "Suspended Sentence",
+  "Sway",
+  "Swedish Pastry",
+  "Swedish Schnapps",
+  "Sweeping Up",
+  "Sweet And Lovely",
+  "Sweet Basil",
+  "Sweet Clifford",
+  "Sweet Eloise",
+  "Sweet Georgia Bright",
+  "Sweet Georgia Brown",
+  "Sweet Henry",
+  "Sweet Home Alabama",
+  "Sweet Lorraine",
+  "Sweet Love",
+  "Sweet Pea",
+  "Sweet Rain",
+  "Sweet Sue Just You",
+  "Sweetest Sounds(The)",
+  "Swing Dentz Swing",
+  "Swing House",
+  "Swing Shift",
+  "Swing Until The Girls Come Home",
+  "Swingin' Shepherd Blues",
+  "Swingin' The Blues",
+  "Swingin' Until The Girls Come Home",
+  "Swinging Shepherd Blues",
+  "Swinging The Blues",
+  "Sy Clone",
+  "Syeeda's Song Flute",
+  "Syn-Anthesia",
+  "T'aint Nobody's Biz-Ness If I Do",
+  "T'aint What You Do (It's The Way That Cha Do It)",
+  "T.B.C. (Terminal Baggage Claim)",
+  "T.J.R.C.",
+  "T.N.T.",
+  "Tadd's Delight",
+  "Tahiti",
+  "Tailgate Ramble (The)",
+  "Take Five",
+  "Take it To The Ozone",
+  "Take The \"A\" Train",
+  "Take The 'A' Train",
+  "Take the A Train",
+  "Taking A Chance On Love",
+  "Tamalpais",
+  "Tame Thy Pen",
+  "Tangerine",
+  "Tank Toon",
+  "Taps Miller",
+  "Taste Of Honey (A)",
+  "Tasty Pudding",
+  "Tautology",
+  "Tea For Two",
+  "Teach Me Tonight",
+  "Tee Pee Time",
+  "Teenie' Blues",
+  "Teeter Totter",
+  "Tell Me A Bedtime Story",
+  "Tell Me Something Good",
+  "Tenderly",
+  "Tenor Madness",
+  "Terry's Chance",
+  "Teru",
+  "That Artt He's All Heart",
+  "That Girl",
+  "That Old Feeling",
+  "That Old Feeling (Standard Version)",
+  "That's All",
+  "That's Earl Brother",
+  "That's Entertainment",
+  "That's Life",
+  "That's Right",
+  "That's What I'm Talkin' 'Bout",
+  "That's What I'm Talking About",
+  "The Blessing",
+  "The Boy Next Door",
+  "The Chicken",
+  "The Closer I Get to You",
+  "The Disguise The Sphinx",
+  "The Duke",
+  "The Goodbye Look",
+  "The Greatest Love of All",
+  "The Island",
+  "The Jitterbug Waltz",
+  "The Lamp Is Low",
+  "The Long and Winding Road",
+  "The Look of Love",
+  "The Masquerade Is Over",
+  "The Midnight Sun",
+  "The Midnight Sun Will Never Set",
+  "The Natives Are Restless Tonight",
+  "The Nearness of You",
+  "The Necessary Blonde",
+  "The Night Has a Thousand Eyes",
+  "The Night We First Met",
+  "The Promise",
+  "The Second Time Around",
+  "The Shadow of Your Smile",
+  "The Song Is You",
+  "The Star-Crossed Lovers",
+  "The Tender Storm",
+  "The Theme",
+  "The Thin05 We Did Last Summer",
+  "The Three Marias",
+  "The Tracks Of My Tears",
+  "The Very Thought of You",
+  "The Way We Were",
+  "The Way You Look Tonight",
+  "The Way You Make Me Feel",
+  "Their's Tears",
+  "Theirs Tears",
+  "Them There Eyes",
+  "Theme (The)",
+  "Theme (What You Gave)",
+  "Theme For Ernie",
+  "Theme For Kareem",
+  "Theme From Maxine",
+  "Theme From Mr. Broadway",
+  "Theme Of No Repeat",
+  "Then Came You",
+  "Then I'll Be Tired Of You",
+  "Then Silk Blue",
+  "There 15 No Greater Love",
+  "There Are Such Thing",
+  "There Goes My Heart",
+  "There Is No Greater Love",
+  "There Will Never Be Another You",
+  "There'll Be Some Changes Made",
+  "There's A Boat Dat's Leavin' Soon For New York",
+  "There's A Lull In My Life",
+  "There's A Small Hotel",
+  "Thermo",
+  "These Foolish Things",
+  "These Foolish Things (ReMind Me Of You)",
+  "These Things Called Changes",
+  "They All Laughed",
+  "They Can't Take That Away from Me",
+  "They Didn't Believe Me",
+  "(They Long to Be) Close to You",
+  "They Say It's Wonderful",
+  "Things Ain't What They Used To Be",
+  "Things TO Come",
+  "Things We Did Last Summer (The)",
+  "Think Of One",
+  "Think On Me",
+  "Thinking Of You",
+  "Thinking Out Loud",
+  "Third Floor Richard",
+  "This Can't Be Love",
+  "This Cant Be Love",
+  "This I Dig Of You",
+  "This Is New",
+  "This Is The Thing",
+  "This Love Of Mine)",
+  "This Lovely Feeling",
+  "This Masquerade",
+  "This Reminds Me Of You",
+  "Three And One",
+  "Three Base Hit",
+  "Three Flowers",
+  "Three Hearts Dancing",
+  "Three Little Words",
+  "Three Views Of A Secret",
+  "Thrill Is Gone (The)",
+  "Thriving From A Riff",
+  "Thriving On A Riff",
+  "Through the Fire",
+  "Thumb The)",
+  "Thumper (The)",
+  "Thursdays Theme",
+  "Thyme's Time",
+  "Tickle Toe",
+  "Tickle-Toe",
+  "Tidal Breeze",
+  "Tiffany",
+  "Til There Was You",
+  "Till There was You",
+  "Time After Time",
+  "Time For Love(A)",
+  "Time Marches On",
+  "Time Remembered",
+  "Time Remembers One Time Once",
+  "Time Tracks",
+  "Time Was",
+  "Times Lie",
+  "Timewisely",
+  "Tin Roof Blues",
+  "Tiny Capers",
+  "Tiny's Blues",
+  "Tippin'",
+  "Tis",
+  "Tis Autumn",
+  "Tishomingo Blues",
+  "To Kill A Brick",
+  "Toad's Place",
+  "Together",
+  "Togetherness",
+  "Tokyo Dream",
+  "Tom Thumb",
+  "Tomato Kiss",
+  "Tommyhawk",
+  "Tomorrow's Destiny",
+  "Tones For Joan's Bones",
+  "Too Close For Comfort",
+  "Too Dam Hot",
+  "Too High",
+  "Too Marvelous For Words",
+  "Tootsie Roll",
+  "Topsy",
+  "Toshiko's Elegy",
+  "Totem Pole",
+  "Touch Of Your Lips",
+  "Touch Of Your Lips (The)",
+  "Tough Talk",
+  "Tour De Force",
+  "Toy Tune",
+  "Train Samba",
+  "Trance",
+  "Trane's Blues",
+  "Trav'lin Light",
+  "Travelin' West",
+  "Travisimo",
+  "Tribute To Brownie",
+  "Trickleydidlier",
+  "Tricrotism",
+  "Trinkle Tinkle",
+  "Triple Play",
+  "Triste",
+  "Tristeza",
+  "True Colors",
+  "Trumpet. Blues",
+  "Truth",
+  "Tune 88",
+  "Tune Up",
+  "Tune-Up",
+  "Tunji",
+  "Tunnel Vision",
+  "Turbo",
+  "Turn Around",
+  "Turn Out The Stars",
+  "Turn Your Love Around",
+  "Turnstile",
+  "Tuxedo junction",
+  "Tuzz's Shadow",
+  "Twelve More Bars To Go",
+  "Twelve Tone Tune (T.T.T.)",
+  "Twisted",
+  "Two Bass Hit",
+  "Two Lonely People (The)",
+  "Two Not One",
+  "Un Poco Loco",
+  "Undecided",
+  "Under A Blanket Of Blue",
+  "Undercurrent",
+  "Unforgettable",
+  "Unit 7",
+  "Unit Seven",
+  "Unless Its You (Orbit)",
+  "Unquity Road",
+  "Until The Real Thing Comes Along",
+  "Until You Come Back to Me",
+  "Up Jumped Spring",
+  "Up With The Lark",
+  "Upper Manhattan Medical Group",
+  "Use Me",
+  "Used To Be A Cha-Cha",
+  "Utter Chaos",
+  "Valdez In The Country",
+  "Valse Hot",
+  "Valse Trists",
+  "Van Lingle Mungo",
+  "Variations On The Scene",
+  "Vashkar",
+  "Veils",
+  "Velas (Velas Icadas)",
+  "Velho Plano",
+  "Venus De Milo",
+  "Very Early",
+  "Very Thought Of You (The)",
+  "Vicky's Dream",
+  "Violets For Your Furs",
+  "Virgo",
+  "Visa",
+  "Viscosity",
+  "Visit (The)",
+  "Vonetta",
+  "Vonetta (Earl Klugh)",
+  "Voyage",
+  "Wabash III",
+  "Wagon Wheels",
+  "Wail",
+  "Wait Till Forever",
+  "Wait Till You See Her",
+  "Walk Don't Run",
+  "Walk Of The Negress",
+  "Walk Tall",
+  "Walkin",
+  "Walkin'",
+  "Walkin' My Baby Back Home",
+  "Walkin' Shoes",
+  "Walkin' Thing (A)",
+  "Walkin' Up",
+  "Wall Street",
+  "Wall-Eye Blues",
+  "Walter L.",
+  "Waltse For Dave",
+  "Waltz",
+  "Waltz For A Lovely Wife",
+  "Waltz For Debby",
+  "Waltz For Derby",
+  "Waltz For Ellington",
+  "Waltz In Eb",
+  "Waltz New",
+  "Waltzin'",
+  "Waltzing Matilda",
+  "Warm Valley",
+  "Watch What Happens",
+  "Water Babies",
+  "Water Colors",
+  "Watermelon Man",
+  "Watersign",
+  "Waterwings",
+  "Wave",
+  "Way Down Yonder In New Orleans",
+  "Way To Go",
+  "Way You Look Tonight (The)",
+  "Way You Look Tonight(The)",
+  "We Kiss In A Shadow",
+  "We Will Meet Again",
+  "We'll Be Together Again",
+  "Weary Blues",
+  "Weaver Of Dreams",
+  "Weaver Of Dreams(A)",
+  "Webb City",
+  "Wee",
+  "Wee Dot",
+  "Wee-Dot",
+  "Weekend Blues",
+  "Well You Needn't",
+  "Well You Needn't (Miles Version)",
+  "Well You Needn't (Monks Version)",
+  "Well You Say You Will",
+  "Wendy",
+  "Wes Side Stroll",
+  "West Coast Blues",
+  "West End Blues",
+  "West What",
+  "Western Reunion",
+  "Westwood Walk",
+  "What 15 This Thing Called Love",
+  "What A Diff'rence A Day Made",
+  "What a Difference a Day Made",
+  "What A Little Moonlight Can Do",
+  "What a Wonderful World",
+  "What Am I Here For",
+  "What Are You Doing The Rest Of Your Life",
+  "What Is This Thing Called Love",
+  "What Is This Thing Love",
+  "What Kind Of Fool Am I",
+  "What Kind Of Fool Am I?",
+  "What Was",
+  "What's Going On",
+  "What's Going On?",
+  "What's Love Got To Do With It",
+  "What's New",
+  "What's New?",
+  "Whatever Possessed Me",
+  "When a Man Loves a Woman",
+  "When All Is Said And Done",
+  "When I Fall in Love",
+  "When I Look In Your Eyes",
+  "When Lights Are Low",
+  "When My Sugar Walks Down The Street",
+  "When Sunny Gets Blue",
+  "When The Sun Comes Out",
+  "When You Meet Here",
+  "When Your Lover Has Gone",
+  "Whenever Your Heart Want's To Sing",
+  "Where Are You",
+  "Where Are You?",
+  "Where Flamingos Fly",
+  "Where Is Love",
+  "Where Is Love?",
+  "Where Or When",
+  "Where You At",
+  "While My Guitar Gently Weeps",
+  "While We're Young",
+  "Whisper Not",
+  "Who Can I Turn To",
+  "Who Can I Turn To?",
+  "Who Cares?",
+  "Who's Got Rhythm",
+  "Who?",
+  "Whopper (The)",
+  "Whose Blues",
+  "Why (Lewis)",
+  "Why (Wilder)",
+  "Why Did I Choose You",
+  "Why Do I Love You?",
+  "Wild Flower",
+  "Wildflower",
+  "Will I You Still Be Mine",
+  "Will You Still Be Mine",
+  "Willie Nillie",
+  "Willow",
+  "Willow Weep For Me",
+  "Wind (The)",
+  "Wind Bag",
+  "Wind Sprint",
+  "Windows",
+  "Winelight",
+  "Wings Of Karma",
+  "Wise One",
+  "Wish For Now",
+  "Wish You Were Here",
+  "Witch Hunt",
+  "Witchcraft",
+  "With A Little Bit Of Luck",
+  "With Every Breath I Take",
+  "Without A Song",
+  "Wonder Why",
+  "Wonderful Tonight",
+  "Woodchopper's Ball",
+  "Woody'n You",
+  "Woody'n You (Algo Bueno)",
+  "Words",
+  "Work",
+  "Work Song",
+  "World Is Waiting For The Sunrise (The)",
+  "Wouldn't it Be Loverly",
+  "Wow",
+  "Wrap Your Troubles In Dreams",
+  "Wrong It Right",
+  "Wrong Together",
+  "X-Stream",
+  "Xlento",
+  "Yama",
+  "Yana Amina",
+  "Yardbird Suite",
+  "Yeah",
+  "Yearnin",
+  "Yellow Fields",
+  "Yes And No",
+  "Yes Indeed",
+  "Yes Or No",
+  "Yes Yes Honey",
+  "Yesterday",
+  "Yesterdays",
+  "Yet Ne'er Broken",
+  "Yo Yo",
+  "You",
+  "You & The Night & The Music",
+  "You And I And George",
+  "You Are So Beautiful",
+  "You Are the Sunshine of My Life",
+  "You Are Too Beautiful",
+  "You Better Go Now",
+  "You Better Leave It Alone",
+  "You Call It Madness (But I Call It Love)",
+  "You Came A Long Way From St. Louis",
+  "You Can't Go Home Again",
+  "You Do Something To Me",
+  "You Don't Know What Love Is",
+  "You Fascinate Me So",
+  "You G0 To My Head",
+  "You Go To My Head",
+  "You Made Me Love You (I Didn't Want To Do It)",
+  "You Make Me Feel So Young",
+  "You Must Believe In Spring",
+  "You Say You Care",
+  "You Stepped Out of a Dream",
+  "You Took Advantage Of Me",
+  "You Turned The Tables On Me",
+  "You'd Be So Nice to Come Home To",
+  "You'll Never Believe",
+  "You'll Never Walk Alone",
+  "You're Everything",
+  "You're My Everything",
+  "You're My Thrill",
+  "You're The Cream In My Coffee",
+  "You've Changed",
+  "Young And Fine",
+  "Young And Foolish",
+  "Young At Heart",
+  "Young Love",
+  "Young One For Debra",
+  "Young Rabbits",
+  "Younger Than Springtime",
+  "Your Mind Is On Vacation",
+  "Your Song",
+  "Your Story",
+  "Yours Is My Heart Alone",
+  "Zaybar",
+  "Zephyr",
+  "Zoom"
+];
+
+function normalizeMusicText(s){
+  return (s || "")
+    .toUpperCase()
+    .normalize("NFKD")
+    .replace(/[^A-Z0-9]+/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+function levenshteinMusic(a,b){
+  a = normalizeMusicText(a);
+  b = normalizeMusicText(b);
+
+  const m = a.length;
+  const n = b.length;
+
+  if(!m) return n;
+  if(!n) return m;
+
+  const prev = Array.from({length:n+1},(_,i)=>i);
+  const curr = new Array(n+1);
+
+  for(let i=1;i<=m;i++){
+    curr[0] = i;
+
+    for(let j=1;j<=n;j++){
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j-1] + 1,
+        prev[j-1] + cost
+      );
+    }
+
+    for(let j=0;j<=n;j++) prev[j] = curr[j];
+  }
+
+  return prev[n];
+}
+
+function musicSimilarity(a,b){
+  const aa = normalizeMusicText(a);
+  const bb = normalizeMusicText(b);
+  const maxLen = Math.max(aa.length,bb.length);
+
+  if(!maxLen) return 0;
+
+  return 1 - levenshteinMusic(aa,bb) / maxLen;
+}
+
+function tokenSimilarity(a,b){
+  const aa = new Set(normalizeMusicText(a).split(" ").filter(Boolean));
+  const bb = new Set(normalizeMusicText(b).split(" ").filter(Boolean));
+
+  if(!aa.size || !bb.size) return 0;
+
+  let common = 0;
+  for(const x of aa){
+    if(bb.has(x)) common++;
+  }
+
+  return common / Math.max(aa.size,bb.size);
+}
+
+function generateOcrVariants(text){
+  const src = normalizeMusicText(text);
+  if(!src) return [];
+
+  const variants = new Set([src]);
+
+  // OCRで起きやすい誤認識を軽く補正したバリエーションを作る
+  const replacements = [
+    [/0/g,"O"],
+    [/1/g,"I"],
+    [/5/g,"S"],
+    [/8/g,"B"],
+    [/\bRN\b/g,"M"],
+    [/\bVV\b/g,"W"],
+    [/\bCL\b/g,"D"],
+    [/\bLI\b/g,"H"]
+  ];
+
+  let current = src;
+  for(const [re,to] of replacements){
+    current = current.replace(re,to);
+    variants.add(current);
+  }
+
+  return [...variants];
+}
+
+function scoreMusicTitle(source,title){
+  const variants = generateOcrVariants(source);
+  let best = 0;
+
+  for(const v of variants){
+    const charScore = musicSimilarity(v,title);
+    const wordScore = tokenSimilarity(v,title);
+
+    let score = charScore * 0.78 + wordScore * 0.22;
+
+    const sw = normalizeMusicText(v).split(" ").filter(Boolean).length;
+    const tw = normalizeMusicText(title).split(" ").filter(Boolean).length;
+
+    score -= Math.abs(sw-tw) * 0.025;
+
+    if(score > best) best = score;
+  }
+
+  return best;
+}
+
+function buildMusicTitleSuggestions(result){
+  const sources = [];
+
+  const add = s=>{
+    s = sanitizeName(s);
+    if(!s) return;
+
+    const key = s.toLowerCase();
+    if(sources.some(x=>x.toLowerCase() === key)) return;
+    sources.push(s);
+  };
+
+  // 現在の自動判定を最優先
+  add(result.title);
+
+  // OCR行もすべて候補の照合元にする
+  for(const s of result.ocrChoices || []){
+    add(s);
+  }
+
+  const scored = [];
+
+  for(const title of MUSIC_TITLES){
+    let bestScore = 0;
+
+    for(const src of sources){
+      const s = scoreMusicTitle(src,title);
+      if(s > bestScore) bestScore = s;
+    }
+
+    scored.push({
+      title,
+      score:bestScore
+    });
+  }
+
+  scored.sort((a,b)=>b.score-a.score);
+
+  // 認識がかなり曖昧な場合も候補を多く出す
+  const top = scored[0]?.score || 0;
+  let count = 10;
+
+  if(top < 0.70) count = 18;
+  else if(top < 0.82) count = 14;
+  else if(top > 0.92) count = 6;
+
+  // まずOCRとの類似度で候補を絞り込み、
+  // 表示時はABC順に並べる
+  return scored
+    .slice(0,count)
+    .sort((a,b)=>a.title.localeCompare(b.title,"en",{sensitivity:"base"}));
+}
+
+
+async function loadImage(file){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = ()=>{
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+
+    img.onerror = ()=>{
+      URL.revokeObjectURL(url);
+      reject(new Error("画像を読み込めませんでした"));
+    };
+
+    img.src = url;
+  });
+}
+
+async function makeTopCanvas(file,ratio){
+  const img = await loadImage(file);
+
+  // OCR精度確保のため、横幅を最大2200px程度まで使用
+  const targetWidth = Math.min(2200,Math.max(1400,img.naturalWidth));
+  const scale = targetWidth / img.naturalWidth;
+
+  const srcW = img.naturalWidth;
+  const srcH = Math.max(100,Math.floor(img.naturalHeight * ratio));
+  const dstW = Math.max(1,Math.round(srcW * scale));
+  const dstH = Math.max(1,Math.round(srcH * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = dstW;
+  canvas.height = dstH;
+
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,dstW,dstH);
+  ctx.drawImage(img,0,0,srcW,srcH,0,0,dstW,dstH);
+
+  return canvas;
+}
+
+function extractCandidates(data,canvasWidth,canvasHeight){
+  const raw = [];
+
+  if(data && Array.isArray(data.lines)){
+    for(const line of data.lines){
+      const text = normalizeLine(line.text || "");
+      if(text.length < 2 || text.length > 90) continue;
+
+      const box = line.bbox || {};
+      const x0 = Number(box.x0 || 0);
+      const y0 = Number(box.y0 || 0);
+      const x1 = Number(box.x1 || 0);
+      const y1 = Number(box.y1 || 0);
+
+      const w = Math.max(1,x1-x0);
+      const h = Math.max(1,y1-y0);
+      const cx = (x0+x1)/2;
+      const centerDistance = Math.abs(cx - canvasWidth/2) / (canvasWidth/2);
+      const yRatio = y0 / Math.max(1,canvasHeight);
+      const widthRatio = w / canvasWidth;
+
+      raw.push({
+        text,x0,y0,x1,y1,w,h,cx,
+        centerDistance,yRatio,widthRatio
+      });
+    }
+  }
+
+  const normalHeights = raw
+    .filter(x=>
+      !looksLikePageNo(x.text) &&
+      !looksLikeChord(x.text)
+    )
+    .map(x=>x.h);
+
+  const medianHeight = median(normalHeights);
+
+  for(const c of raw){
+    let score = 0;
+
+    // 最重要：周囲の通常文字より大きいか
+    const sizeRatio = c.h / Math.max(1,medianHeight);
+
+    if(sizeRatio >= 2.2) score += 170;
+    else if(sizeRatio >= 1.8) score += 135;
+    else if(sizeRatio >= 1.5) score += 100;
+    else if(sizeRatio >= 1.25) score += 65;
+    else if(sizeRatio >= 1.10) score += 25;
+    else score -= 15;
+
+    // 絶対的な高さも評価
+    score += Math.min(80,c.h * 1.3);
+
+    // 最重要：ページ中央に近いか
+    if(c.centerDistance <= 0.08) score += 150;
+    else if(c.centerDistance <= 0.16) score += 120;
+    else if(c.centerDistance <= 0.25) score += 75;
+    else if(c.centerDistance <= 0.35) score += 30;
+    else score -= 30;
+
+    // タイトルは上部中央に置かれることが多い
+    if(c.yRatio <= 0.08) score += 15;
+    else if(c.yRatio <= 0.30) score += 55;
+    else if(c.yRatio <= 0.55) score += 25;
+    else score -= 25;
+
+    // タイトルらしい適度な文字列長
+    const chars = c.text.length;
+    if(chars >= 3 && chars <= 35) score += 45;
+    else if(chars <= 55) score += 15;
+    else score -= 35;
+
+    const words = c.text.split(/\s+/).filter(Boolean).length;
+    if(words <= 5) score += 30;
+    else if(words >= 8) score -= 45;
+
+    // 文字の占有幅
+    if(c.widthRatio >= 0.08 && c.widthRatio <= 0.55) score += 25;
+    if(c.widthRatio > 0.75) score -= 30;
+
+    score += letterRatio(c.text) * 25;
+
+    // 明確な除外
+    if(looksLikePageNo(c.text)) score -= 350;
+    if(looksLikeCredit(c.text)) score -= 300;
+    if(looksLikeChord(c.text)) score -= 320;
+    if(looksLikeTempo(c.text)) score -= 180;
+    if(looksLikeLyricSentence(c.text)) score -= 100;
+    if(/[©]/.test(c.text)) score -= 300;
+
+    // 「by ～」のようなクレジット断片を除外
+    if(/\bby\b/i.test(c.text)) score -= 160;
+
+    c.sizeRatio = sizeRatio;
+    c.score = score;
+  }
+
+  raw.sort((a,b)=>b.score-a.score);
+  return raw;
+}
+
+function buildOcrChoices(data){
+  const choices = [];
+  const seen = new Set();
+
+  // Tesseractが認識した「行」をそのまま候補にする。
+  // 同じ行に複数単語がある場合は、まとめて1つのボタンにする。
+  if(data && Array.isArray(data.lines)){
+    for(const line of data.lines){
+      const text = sanitizeName(normalizeLine(line.text || ""));
+      if(!text) continue;
+      if(text.length < 2) continue;
+
+      const key = text.toLowerCase();
+      if(seen.has(key)) continue;
+      seen.add(key);
+      choices.push(text);
+    }
+  }
+
+  // line情報がない場合はOCR全文を改行ごとに分けて候補化
+  if(!choices.length && data && data.text){
+    for(const raw of data.text.split(/\r?\n/)){
+      const text = sanitizeName(normalizeLine(raw));
+      if(!text || text.length < 2) continue;
+
+      const key = text.toLowerCase();
+      if(seen.has(key)) continue;
+      seen.add(key);
+      choices.push(text);
+    }
+  }
+
+  return choices;
+}
+
+function chooseTitle(data,canvasWidth,canvasHeight){
+  const candidates = extractCandidates(data,canvasWidth,canvasHeight);
+
+  let title = "";
+
+  // 中央かつ通常文字より大きい候補を最優先
+  const strong = candidates.find(c=>
+    c.centerDistance <= 0.30 &&
+    c.sizeRatio >= 1.15 &&
+    !looksLikeCredit(c.text) &&
+    !looksLikeChord(c.text) &&
+    !looksLikeTempo(c.text) &&
+    !looksLikePageNo(c.text)
+  );
+
+  if(strong){
+    title = strong.text;
+  }else if(candidates.length){
+    title = candidates[0].text;
+  }
+
+  title = sanitizeName(title);
+
+  title = title
+    .replace(/^[^A-Za-zÀ-ÿ一-龯ぁ-んァ-ヶ0-9]+/,"")
+    .replace(/[^A-Za-zÀ-ÿ一-龯ぁ-んァ-ヶ0-9)'’&+\- ]+$/,"")
+    .trim();
+
+  return {
+    title,
+    candidates:candidates.slice(0,6)
+  };
+}
+
+function updateFilename(result,index){
+  const title = sanitizeName(result.input.value) || baseOf(result.file.name);
+
+  // 念のため、現在のresults上の位置を優先する
+  const liveIndex = results.indexOf(result);
+  const useIndex = liveIndex >= 0 ? liveIndex : index;
+
+  const digits = prefixEl.value;
+  const prefix =
+    digits === "none"
+      ? ""
+      : String(useIndex+1).padStart(Number(digits),"0") + " ";
+
+  result.finalName = prefix + title + extOf(result.file.name);
+  result.filenameEl.textContent = "保存名：" + result.finalName;
+}
+
+function nextPageTitle(previousTitle){
+  const title = sanitizeName(previousTitle);
+  if(!title) return "";
+
+  // 末尾が「-数字」なら数字を1増やす
+  // 例：Bird-2 → Bird-3
+  const m = title.match(/^(.*?)-(\d+)$/);
+
+  if(m){
+    const base = sanitizeName(m[1]);
+    const n = Number(m[2]);
+
+    if(base && Number.isFinite(n)){
+      return `${base}-${n + 1}`;
+    }
+  }
+
+  // 数字が付いていなければ2ページ目として「-2」を付ける
+  // 例：Bird → Bird-2
+  return `${title}-2`;
+}
+
+function renderResult(result,index){
+  const item = document.createElement("div");
+  item.className = "item";
+
+  const thumbCrop = document.createElement("div");
+  thumbCrop.className = "thumbCrop";
+
+  const img = document.createElement("img");
+  img.className = "thumb";
+  img.src = result.preview;
+  img.alt = result.file.name;
+
+  // 画像全体を横幅に合わせて縮尺し、その高さの上1/5だけを表示する
+  const applyCropHeight = ()=>{
+    if(!img.naturalWidth || !img.naturalHeight) return;
+
+    const displayedWidth = img.getBoundingClientRect().width;
+    const displayedFullHeight =
+      displayedWidth * img.naturalHeight / img.naturalWidth;
+
+    thumbCrop.style.height =
+      Math.max(1, displayedFullHeight / 3) + "px";
+  };
+
+  img.addEventListener("load",applyCropHeight);
+  window.addEventListener("resize",applyCropHeight);
+
+  thumbCrop.appendChild(img);
+
+  const right = document.createElement("div");
+  right.className = "right";
+
+  const original = document.createElement("div");
+  original.className = "original";
+  original.textContent = "元ファイル：" + result.file.name;
+
+  const titleRow = document.createElement("div");
+  titleRow.className = "titleRow";
+
+  const input = document.createElement("input");
+  input.className = "titleInput";
+  input.value = result.title || baseOf(result.file.name);
+  input.placeholder = "曲名";
+
+  const reset = document.createElement("button");
+  reset.className = "smallbtn";
+  reset.textContent = "元名に戻す";
+  reset.onclick = ()=>{
+    input.value = baseOf(result.file.name);
+    result.title = input.value;
+
+    const currentIndex = results.indexOf(result);
+    updateFilename(result,currentIndex >= 0 ? currentIndex : index);
+  };
+
+  titleRow.appendChild(input);
+  titleRow.appendChild(reset);
+
+  const filenameEl = document.createElement("div");
+  filenameEl.className = "filename";
+
+  const ocrchoices = document.createElement("div");
+  ocrchoices.className = "ocrchoices";
+
+  const ocrchoicesTitle = document.createElement("div");
+  ocrchoicesTitle.className = "ocrchoicesTitle";
+  ocrchoicesTitle.textContent = "OCRした文字：押すとタイトルに設定";
+
+  const ocrbuttons = document.createElement("div");
+  ocrbuttons.className = "ocrbuttons";
+
+  const buttonList = [];
+
+  for(const text of result.ocrChoices || []){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ocrbtn";
+    btn.textContent = text;
+
+    btn.addEventListener("click",()=>{
+      input.value = text;
+      result.title = text;
+
+      const currentIndex = results.indexOf(result);
+      updateFilename(result,currentIndex >= 0 ? currentIndex : index);
+
+      for(const b of buttonList){
+        b.classList.remove("selected");
+      }
+      btn.classList.add("selected");
+    });
+
+    buttonList.push(btn);
+    ocrbuttons.appendChild(btn);
+  }
+
+  if(!buttonList.length){
+    const empty = document.createElement("div");
+    empty.className = "candidates";
+    empty.textContent = "OCR文字を取得できませんでした";
+    ocrbuttons.appendChild(empty);
+  }
+
+  ocrchoices.appendChild(ocrchoicesTitle);
+  ocrchoices.appendChild(ocrbuttons);
+
+  right.appendChild(original);
+  right.appendChild(titleRow);
+  right.appendChild(filenameEl);
+
+  const sameAsPreviousBtn = document.createElement("button");
+  sameAsPreviousBtn.type = "button";
+  sameAsPreviousBtn.className = "smallbtn";
+  sameAsPreviousBtn.style.marginTop = "8px";
+  sameAsPreviousBtn.textContent = "上のページと同じタイトルをつける";
+
+  if(index === 0){
+    sameAsPreviousBtn.disabled = true;
+    sameAsPreviousBtn.title = "1ページ目では使用できません";
+  }else{
+    sameAsPreviousBtn.addEventListener("click",()=>{
+      // 作成時のindexではなく、クリック時点で現在位置を取得する
+      const currentIndex = results.indexOf(result);
+
+      if(currentIndex <= 0){
+        return;
+      }
+
+      const previous = results[currentIndex - 1];
+
+      if(!previous || !previous.input){
+        return;
+      }
+
+      // 直前ページの現在の入力欄をその場で参照する
+      const previousTitle = sanitizeName(previous.input.value);
+
+      if(!previousTitle){
+        return;
+      }
+
+      const newTitle = nextPageTitle(previousTitle);
+
+      if(!newTitle){
+        return;
+      }
+
+      input.value = newTitle;
+      result.title = newTitle;
+
+      // 保存名の連番も現在位置で更新する
+      updateFilename(result,currentIndex);
+
+      // OCR候補ボタンの選択表示を解除
+      for(const b of buttonList){
+        b.classList.remove("selected");
+      }
+    });
+  }
+
+  right.appendChild(sameAsPreviousBtn);
+  right.appendChild(ocrchoices);
+
+  const suggestBox = document.createElement("div");
+  suggestBox.className = "suggestBox";
+
+  const suggestTitle = document.createElement("div");
+  suggestTitle.className = "suggestTitle";
+  suggestTitle.textContent = "楽曲名から推定：押すとタイトルに設定";
+
+  const suggestButtons = document.createElement("div");
+  suggestButtons.className = "suggestButtons";
+
+  if(result.musicSuggestions && result.musicSuggestions.length){
+    const suggestionButtonList = [];
+
+    for(const item of result.musicSuggestions){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "suggestBtn";
+      btn.textContent = item.title;
+
+      btn.addEventListener("click",()=>{
+        input.value = item.title;
+        result.title = item.title;
+
+        const currentIndex = results.indexOf(result);
+        updateFilename(result,currentIndex >= 0 ? currentIndex : index);
+
+        for(const b of buttonList){
+          b.classList.remove("selected");
+        }
+
+        for(const b of suggestionButtonList){
+          b.classList.remove("selected");
+        }
+
+        btn.classList.add("selected");
+      });
+
+      suggestionButtonList.push(btn);
+      suggestButtons.appendChild(btn);
+    }
+  }else{
+    const st = document.createElement("div");
+    st.className = "suggestStatus";
+    st.textContent = "近い楽曲名候補は見つかりませんでした";
+    suggestButtons.appendChild(st);
+  }
+
+  suggestBox.appendChild(suggestTitle);
+  suggestBox.appendChild(suggestButtons);
+  right.appendChild(suggestBox);
+
+  item.appendChild(thumbCrop);
+  item.appendChild(right);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "deletebtn";
+  deleteBtn.title = "この画像を削除";
+  deleteBtn.setAttribute("aria-label","この画像を削除");
+  deleteBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6l-1 14H6L5 6"></path>
+      <path d="M10 11v6"></path>
+      <path d="M14 11v6"></path>
+      <path d="M9 6V4h6v2"></path>
+    </svg>`;
+
+  deleteBtn.addEventListener("click",()=>{
+    const currentIndex = results.indexOf(result);
+
+    if(currentIndex >= 0){
+      removeResult(currentIndex);
+    }
+  });
+
+  item.appendChild(deleteBtn);
+  listEl.appendChild(item);
+
+  result.input = input;
+  result.filenameEl = filenameEl;
+
+  input.addEventListener("input",()=>{
+    result.title = sanitizeName(input.value);
+
+    const currentIndex = results.indexOf(result);
+    updateFilename(result,currentIndex >= 0 ? currentIndex : index);
+  });
+
+  updateFilename(result,index);
+}
+
+function rerenderResults(){
+  listEl.innerHTML = "";
+
+  results.forEach((result,index)=>{
+    // 現在の入力値をタイトルとして保持してから再描画
+    if(result.input){
+      result.title = sanitizeName(result.input.value) || result.title || baseOf(result.file.name);
+    }
+
+    renderResult(result,index);
+  });
+
+  zipBtn.disabled = results.length === 0;
+}
+
+function removeResult(index){
+  if(index < 0 || index >= results.length) return;
+
+  // 現在の編集内容を全件保存
+  results.forEach(r=>{
+    if(r.input){
+      r.title = sanitizeName(r.input.value) || r.title || baseOf(r.file.name);
+    }
+  });
+
+  const removed = results[index];
+
+  if(removed && removed.preview){
+    URL.revokeObjectURL(removed.preview);
+  }
+
+  results.splice(index,1);
+
+  rerenderResults();
+
+  if(results.length){
+    setStatus(`1画像を削除しました。残り${results.length}画像です。`,"ok");
+  }else{
+    setStatus("すべての画像を削除しました。");
+  }
+}
+
+function chooseFiles(files){
+  for(const r of results){
+    if(r.preview) URL.revokeObjectURL(r.preview);
+  }
+
+  results = [];
+  listEl.innerHTML = "";
+  setProgress(0);
+
+  selected = Array.from(files || []).filter(f=>
+    /^image\//.test(f.type) || /\.(jpe?g|png|webp)$/i.test(f.name)
+  );
+
+  analyzeBtn.disabled = selected.length === 0;
+  zipBtn.disabled = true;
+
+  if(selected.length){
+    setStatus(`${selected.length}個の画像を選択しました。「タイトルを判定」を押してください。`);
+  }else{
+    setStatus("楽譜画像を選択してください。");
+  }
+}
+
+filesInput.addEventListener("change",e=>chooseFiles(e.target.files));
+
+["dragenter","dragover"].forEach(type=>{
+  drop.addEventListener(type,e=>{
+    e.preventDefault();
+    drop.classList.add("drag");
+  });
+});
+
+["dragleave","drop"].forEach(type=>{
+  drop.addEventListener(type,e=>{
+    e.preventDefault();
+    drop.classList.remove("drag");
+  });
+});
+
+drop.addEventListener("drop",e=>chooseFiles(e.dataTransfer.files));
+
+async function ensureWorker(lang){
+  if(worker){
+    try{await worker.terminate()}catch(e){}
+    worker = null;
+  }
+
+  setStatus("OCRエンジンを準備しています…");
+
+  worker = await Tesseract.createWorker(lang,1,{
+    logger:()=>{}
+  });
+
+  await worker.setParameters({
+    preserve_interword_spaces:"1",
+    tessedit_pageseg_mode:"11"
+  });
+}
+
+analyzeBtn.addEventListener("click",async()=>{
+  if(!selected.length) return;
+
+  analyzeBtn.disabled = true;
+  zipBtn.disabled = true;
+  listEl.innerHTML = "";
+  results = [];
+  setProgress(0);
+
+  try{
+    await ensureWorker(langEl.value);
+
+    const ratio = Number(ocrHeightEl.value);
+
+    for(let i=0;i<selected.length;i++){
+      const file = selected[i];
+
+      setStatus(`${i+1} / ${selected.length}　${file.name} のタイトルを判定中…`);
+
+      const canvas = await makeTopCanvas(file,ratio);
+      const out = await worker.recognize(canvas);
+      const chosen = chooseTitle(out.data,canvas.width,canvas.height);
+
+      const preview = URL.createObjectURL(file);
+
+      const result = {
+        file,
+        title:chosen.title,
+        candidates:chosen.candidates,
+        ocrText:(out.data.text || "").trim(),
+        ocrChoices:buildOcrChoices(out.data),
+        musicSuggestions:[],
+        preview,
+        input:null,
+        filenameEl:null,
+        finalName:""
+      };
+
+      // 通常OCRの結果を使って、その場で楽曲名辞書と照合する。
+      // 追加OCRや外部検索は行わないので処理負荷は小さい。
+      result.musicSuggestions = buildMusicTitleSuggestions(result);
+
+      results.push(result);
+      renderResult(result,i);
+
+      setProgress(Math.round((i+1)/selected.length*100));
+
+      canvas.width = 1;
+      canvas.height = 1;
+
+      await new Promise(r=>setTimeout(r,0));
+    }
+
+    zipBtn.disabled = results.length === 0;
+    setStatus(
+      `${results.length}個のタイトル判定が完了しました。曲名を確認してからZIP保存してください。`,
+      "ok"
+    );
+  }catch(err){
+    console.error(err);
+    setStatus("タイトル判定に失敗しました。" + (err?.message || err),"error");
+  }finally{
+    analyzeBtn.disabled = selected.length === 0;
+  }
+});
+
+prefixEl.addEventListener("change",()=>{
+  results.forEach((r,i)=>updateFilename(r,i));
+});
+
+zipBtn.addEventListener("click",async()=>{
+  if(!results.length) return;
+
+  zipBtn.disabled = true;
+  analyzeBtn.disabled = true;
+
+  try{
+    setStatus("ZIPファイルを作成しています…");
+
+    const zip = new JSZip();
+    const used = {};
+
+    for(let i=0;i<results.length;i++){
+      const r = results[i];
+
+      updateFilename(r,i);
+
+      let name = r.finalName;
+      const ext = extOf(name);
+      const stem = name.slice(0,-ext.length);
+      const key = name.toLowerCase();
+
+      if(used[key]){
+        used[key] += 1;
+        name = `${stem} (${used[key]})${ext}`;
+      }else{
+        used[key] = 1;
+      }
+
+      zip.file(name,r.file);
+
+      setProgress(Math.round((i+1)/results.length*90));
+      await new Promise(r=>setTimeout(r,0));
+    }
+
+    const blob = await zip.generateAsync(
+      {type:"blob",compression:"STORE"},
+      meta=>{
+        setProgress(90 + Math.round(meta.percent*0.1));
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "楽譜_曲名変更済み.zip";
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+
+    setProgress(100);
+    setStatus("曲名に変更した画像をZIPで保存しました。","ok");
+  }catch(err){
+    console.error(err);
+    setStatus("ZIP作成に失敗しました。" + (err?.message || err),"error");
+  }finally{
+    zipBtn.disabled = results.length === 0;
+    analyzeBtn.disabled = selected.length === 0;
+  }
+});
+
+clearBtn.addEventListener("click",async()=>{
+  selected = [];
+
+  for(const r of results){
+    if(r.preview) URL.revokeObjectURL(r.preview);
+  }
+
+  results = [];
+  filesInput.value = "";
+  listEl.innerHTML = "";
+
+  analyzeBtn.disabled = true;
+  zipBtn.disabled = true;
+
+  setProgress(0);
+  setStatus("楽譜画像を選択してください。");
+
+  if(worker){
+    try{await worker.terminate()}catch(e){}
+    worker = null;
+  }
+});
+</script>
+</body>
+</html>
